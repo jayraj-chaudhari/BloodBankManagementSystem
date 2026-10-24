@@ -75,7 +75,7 @@ router.post('/', authenticate, authorizeRoles('hospital_user', 'bb_officer', 'ad
   }
 });
 
-// GET /api/v1/requests (officer/admin/auditor: all; hospital_user: own hospital only)
+// GET /api/v1/requests (officer/admin/auditor: all; hospital_user: own hospital only via RLS/view)
 router.get('/', authenticate, async (req, res, next) => {
   try {
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
@@ -87,7 +87,7 @@ router.get('/', authenticate, async (req, res, next) => {
     let whereClause = ' WHERE 1=1';
     const params = [];
 
-    // Enforce hospital tenant isolation for hospital_user
+    // Enforce hospital tenant isolation for hospital_user if RLS is bypassed in direct query
     if (req.user.role === 'hospital_user') {
       params.push(req.user.hospital_id);
       whereClause += ` AND r.hospital_id = $${params.length}`;
@@ -110,25 +110,41 @@ router.get('/', authenticate, async (req, res, next) => {
       whereClause += ` AND r.component = $${params.length}`;
     }
 
-    const countQuery = `SELECT count(*)::int AS total FROM blood_request r ${whereClause}`;
-    const dataQuery = `
-      SELECT r.request_id, r.hospital_id, r.requested_by, r.patient_ref,
-             r.blood_group, r.component, r.units_needed, r.urgency, r.status,
-             r.needed_by, r.created_at, r.updated_at,
-             h.hospital_name, h.region_code,
-             (SELECT count(*)::int FROM request_allocation ra WHERE ra.request_id = r.request_id) AS units_allocated
-        FROM blood_request r
-        JOIN hospital h ON h.hospital_id = r.hospital_id
-      ${whereClause}
-       ORDER BY CASE r.urgency WHEN 'EMERGENCY' THEN 1 WHEN 'URGENT' THEN 2 ELSE 3 END,
-                r.created_at DESC
-       LIMIT $${params.length + 1} OFFSET $${params.length + 2}
-    `;
-
     const { total, rows } = await withContext(req.user, async (client) => {
-      const countRes = await client.query(countQuery, params);
-      const dataRes = await client.query(dataQuery, [...params, limit, offset]);
-      return { total: countRes.rows[0].total, rows: dataRes.rows };
+      // First attempt querying v_request_summary
+      try {
+        const countRes = await client.query(`SELECT count(*)::int AS total FROM v_request_summary r ${whereClause}`, params);
+        const dataRes = await client.query(`
+          SELECT r.request_id, r.hospital_id, r.hospital_name, r.blood_group, r.component,
+                 r.units_needed, r.units_allocated, r.urgency, r.status, r.needed_by,
+                 r.created_at, r.updated_at
+            FROM v_request_summary r
+          ${whereClause}
+           ORDER BY CASE r.urgency WHEN 'EMERGENCY' THEN 1 WHEN 'URGENT' THEN 2 ELSE 3 END,
+                    r.created_at DESC
+           LIMIT $${params.length + 1} OFFSET $${params.length + 2}
+        `, [...params, limit, offset]);
+
+        return { total: countRes.rows[0].total, rows: dataRes.rows };
+      } catch (viewErr) {
+        // Fallback to direct table join if view has not yet been loaded
+        const countRes = await client.query(`SELECT count(*)::int AS total FROM blood_request r ${whereClause}`, params);
+        const dataRes = await client.query(`
+          SELECT r.request_id, r.hospital_id, r.requested_by, r.patient_ref,
+                 r.blood_group, r.component, r.units_needed, r.urgency, r.status,
+                 r.needed_by, r.created_at, r.updated_at,
+                 h.hospital_name, h.region_code,
+                 (SELECT count(*)::int FROM request_allocation ra WHERE ra.request_id = r.request_id) AS units_allocated
+            FROM blood_request r
+            JOIN hospital h ON h.hospital_id = r.hospital_id
+          ${whereClause}
+           ORDER BY CASE r.urgency WHEN 'EMERGENCY' THEN 1 WHEN 'URGENT' THEN 2 ELSE 3 END,
+                    r.created_at DESC
+           LIMIT $${params.length + 1} OFFSET $${params.length + 2}
+        `, [...params, limit, offset]);
+
+        return { total: countRes.rows[0].total, rows: dataRes.rows };
+      }
     });
 
     return res.status(200).json({

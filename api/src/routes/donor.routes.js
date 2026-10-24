@@ -14,12 +14,26 @@ router.get('/me', authenticate, authorizeRoles('donor'), async (req, res, next) 
       const q = `
         SELECT d.donor_id, d.user_id, d.date_of_birth, d.gender, d.blood_group,
                d.weight_kg, d.region_code, d.latitude, d.longitude, d.is_available,
-               u.full_name, u.email
+               u.full_name, u.email,
+               v.last_donated_at, v.next_eligible_on, v.is_eligible
           FROM donor d
           JOIN app_user u ON u.user_id = d.user_id
+     LEFT JOIN v_donor_eligibility v ON v.donor_id = d.donor_id
          WHERE d.user_id = $1
       `;
-      return client.query(q, [req.user.user_id]);
+      try {
+        return await client.query(q, [req.user.user_id]);
+      } catch (e) {
+        // Fallback without view
+        return await client.query(`
+          SELECT d.donor_id, d.user_id, d.date_of_birth, d.gender, d.blood_group,
+                 d.weight_kg, d.region_code, d.latitude, d.longitude, d.is_available,
+                 u.full_name, u.email
+            FROM donor d
+            JOIN app_user u ON u.user_id = d.user_id
+           WHERE d.user_id = $1
+        `, [req.user.user_id]);
+      }
     });
 
     if (result.rows.length === 0) {
@@ -46,7 +60,7 @@ router.get('/', authenticate, authorizeRoles('bb_officer', 'admin', 'lab_tech'),
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
     const offset = (page - 1) * limit;
 
-    const { blood_group, region_code, is_available } = req.query;
+    const { blood_group, region_code, is_available, eligible } = req.query;
 
     let whereClause = ' WHERE 1=1';
     const params = [];
@@ -66,22 +80,53 @@ router.get('/', authenticate, authorizeRoles('bb_officer', 'admin', 'lab_tech'),
       whereClause += ` AND d.is_available = $${params.length}`;
     }
 
-    const countQuery = `SELECT count(*)::int AS total FROM donor d ${whereClause}`;
-    const dataQuery = `
-      SELECT d.donor_id, d.user_id, d.date_of_birth, d.gender, d.blood_group,
-             d.weight_kg, d.region_code, d.latitude, d.longitude, d.is_available,
-             d.created_at, u.full_name, u.email
-        FROM donor d
-        JOIN app_user u ON u.user_id = d.user_id
-      ${whereClause}
-       ORDER BY d.donor_id DESC
-       LIMIT $${params.length + 1} OFFSET $${params.length + 2}
-    `;
-
     const { total, rows } = await withContext(req.user, async (client) => {
-      const countRes = await client.query(countQuery, params);
-      const dataRes = await client.query(dataQuery, [...params, limit, offset]);
-      return { total: countRes.rows[0].total, rows: dataRes.rows };
+      let eligibleJoin = `LEFT JOIN v_donor_eligibility v ON v.donor_id = d.donor_id`;
+      let eligibilitySelect = `, v.last_donated_at, v.next_eligible_on, v.is_eligible`;
+      let extraWhere = '';
+
+      if (eligible === 'true') {
+        extraWhere = ' AND (v.is_eligible = true OR v.is_eligible IS NULL)';
+      }
+
+      try {
+        const countRes = await client.query(`
+          SELECT count(d.donor_id)::int AS total
+            FROM donor d
+          ${eligibleJoin}
+          ${whereClause} ${extraWhere}
+        `, params);
+
+        const dataRes = await client.query(`
+          SELECT d.donor_id, d.user_id, d.date_of_birth, d.gender, d.blood_group,
+                 d.weight_kg, d.region_code, d.latitude, d.longitude, d.is_available,
+                 d.created_at, u.full_name, u.email
+                 ${eligibilitySelect}
+            FROM donor d
+            JOIN app_user u ON u.user_id = d.user_id
+          ${eligibleJoin}
+          ${whereClause} ${extraWhere}
+           ORDER BY d.donor_id DESC
+           LIMIT $${params.length + 1} OFFSET $${params.length + 2}
+        `, [...params, limit, offset]);
+
+        return { total: countRes.rows[0].total, rows: dataRes.rows };
+      } catch (viewErr) {
+        // Fallback without v_donor_eligibility view
+        const countRes = await client.query(`SELECT count(*)::int AS total FROM donor d ${whereClause}`, params);
+        const dataRes = await client.query(`
+          SELECT d.donor_id, d.user_id, d.date_of_birth, d.gender, d.blood_group,
+                 d.weight_kg, d.region_code, d.latitude, d.longitude, d.is_available,
+                 d.created_at, u.full_name, u.email
+            FROM donor d
+            JOIN app_user u ON u.user_id = d.user_id
+          ${whereClause}
+           ORDER BY d.donor_id DESC
+           LIMIT $${params.length + 1} OFFSET $${params.length + 2}
+        `, [...params, limit, offset]);
+
+        return { total: countRes.rows[0].total, rows: dataRes.rows };
+      }
     });
 
     return res.status(200).json({
@@ -106,15 +151,29 @@ router.get('/:donor_id', authenticate, authorizeRoles('bb_officer', 'admin', 'la
     }
 
     const result = await withContext(req.user, async (client) => {
-      return client.query(
-        `SELECT d.donor_id, d.user_id, d.date_of_birth, d.gender, d.blood_group,
-                d.weight_kg, d.region_code, d.latitude, d.longitude, d.is_available,
-                d.created_at, u.full_name, u.email
-           FROM donor d
-           JOIN app_user u ON u.user_id = d.user_id
-          WHERE d.donor_id = $1`,
-        [donorId]
-      );
+      try {
+        return await client.query(
+          `SELECT d.donor_id, d.user_id, d.date_of_birth, d.gender, d.blood_group,
+                  d.weight_kg, d.region_code, d.latitude, d.longitude, d.is_available,
+                  d.created_at, u.full_name, u.email,
+                  v.last_donated_at, v.next_eligible_on, v.is_eligible
+             FROM donor d
+             JOIN app_user u ON u.user_id = d.user_id
+        LEFT JOIN v_donor_eligibility v ON v.donor_id = d.donor_id
+            WHERE d.donor_id = $1`,
+          [donorId]
+        );
+      } catch (viewErr) {
+        return await client.query(
+          `SELECT d.donor_id, d.user_id, d.date_of_birth, d.gender, d.blood_group,
+                  d.weight_kg, d.region_code, d.latitude, d.longitude, d.is_available,
+                  d.created_at, u.full_name, u.email
+             FROM donor d
+             JOIN app_user u ON u.user_id = d.user_id
+            WHERE d.donor_id = $1`,
+          [donorId]
+        );
+      }
     });
 
     if (result.rows.length === 0) {
@@ -135,7 +194,6 @@ router.get('/:donor_id/contact', authenticate, async (req, res, next) => {
       return res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'Invalid donor_id' } });
     }
 
-    // Role check: must be bb_officer or the donor themselves
     if (req.user.role !== 'bb_officer' && req.user.role !== 'admin') {
       if (req.user.role !== 'donor' || req.user.donor_id !== donorId) {
         return res.status(403).json({
@@ -148,7 +206,6 @@ router.get('/:donor_id/contact', authenticate, async (req, res, next) => {
     }
 
     const result = await withContext(req.user, async (client) => {
-      // Call fn_decrypt_text for pgcrypto decrypted fields
       try {
         return await client.query(
           `SELECT donor_id,
@@ -161,7 +218,6 @@ router.get('/:donor_id/contact', authenticate, async (req, res, next) => {
           [donorId]
         );
       } catch (decErr) {
-        // Fallback using pgp_sym_decrypt if fn_decrypt_text function not granted
         return await client.query(
           `SELECT donor_id,
                   pgp_sym_decrypt(phone_enc, current_setting('app.enc_key', true)) AS phone,
@@ -179,7 +235,6 @@ router.get('/:donor_id/contact', authenticate, async (req, res, next) => {
       return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Contact record not found' } });
     }
 
-    // Record access in MongoDB audit trail as required by the specification
     await audit(req, 'PII_VIEWED', 'donor_contact', donorId, {
       viewed_by_role: req.user.role,
       donor_id: donorId
@@ -201,7 +256,6 @@ router.patch('/:donor_id', authenticate, validate(updateDonorSchema), async (req
       return res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'Invalid donor_id' } });
     }
 
-    // Permission check
     if (req.user.role !== 'bb_officer' && req.user.role !== 'admin') {
       if (req.user.role !== 'donor' || req.user.donor_id !== donorId) {
         return res.status(403).json({

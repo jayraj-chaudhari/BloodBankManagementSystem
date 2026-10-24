@@ -92,7 +92,7 @@ router.post('/register-donor', validate(registerDonorSchema), async (req, res, n
 
     // Audit trail log
     await audit(
-      { ip: req.ip, user: { user_id: userId, role: 'donor' } },
+      req,
       'DONATION_CREATED',
       'donor',
       donorId,
@@ -228,7 +228,8 @@ router.post('/login', validate(loginSchema), async (req, res, next) => {
       expiresIn: config.JWT_EXPIRES_IN
     });
 
-    await audit({ ...req, user: payload }, 'LOGIN_SUCCESS', 'app_user', user.user_id, { email: cleanEmail });
+    req.user = payload;
+    await audit(req, 'LOGIN_SUCCESS', 'app_user', user.user_id, { email: cleanEmail });
 
     return res.status(200).json({
       data: {

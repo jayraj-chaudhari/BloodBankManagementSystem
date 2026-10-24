@@ -7,9 +7,6 @@
   "scripts": {
     "start": "node api/src/server.js",
     "dev": "nodemon api/src/server.js",
-    "web:dev": "npm --prefix web run dev",
-    "web:build": "npm --prefix web run build",
-    "web:preview": "npm --prefix web run preview",
     "db:setup": "node scripts/db-setup.js",
     "db:reset": "node scripts/db-reset.js"
   },

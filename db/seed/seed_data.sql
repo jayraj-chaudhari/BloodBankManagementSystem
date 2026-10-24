@@ -11,11 +11,14 @@ SELECT set_config('app.enc_key', 'default_32_character_encryption_secret_key!', 
 
 -- 1) Branches (Regional Hub + 4 Local Centres)
 INSERT INTO branch (branch_name, region_code, parent_branch_id, address, latitude, longitude) VALUES
-    ('Surat Central Hub',       'SUR', NULL, ROW('Ring Road', 'Surat', 'Gujarat', '395001')::address_t, 21.170240, 72.831061),
-    ('Ahmedabad Civil Branch',  'AHM', 1,    ROW('Asarwa', 'Ahmedabad', 'Gujarat', '380016')::address_t, 23.022505, 72.571362),
-    ('Vadodara City Centre',    'VAD', 1,    ROW('Sayajigunj', 'Vadodara', 'Gujarat', '390005')::address_t, 22.307159, 73.181219),
-    ('Rajkot Regional Branch',  'RAJ', 1,    ROW('Kotecha Chowk', 'Rajkot', 'Gujarat', '360001')::address_t, 22.303894, 70.802160),
-    ('Surat Adajan Centre',     'SUR', 1,    ROW('Adajan Gam', 'Surat', 'Gujarat', '395009')::address_t, 21.195900, 72.793300)
+    ('Surat Central Hub',       'SUR', NULL, ROW('Ring Road', 'Surat', 'Gujarat', '395001')::address_t, 21.170240, 72.831061)
+ON CONFLICT (branch_name) DO NOTHING;
+
+INSERT INTO branch (branch_name, region_code, parent_branch_id, address, latitude, longitude) VALUES
+    ('Ahmedabad Civil Branch',  'AHM', (SELECT branch_id FROM branch WHERE branch_name = 'Surat Central Hub'), ROW('Asarwa', 'Ahmedabad', 'Gujarat', '380016')::address_t, 23.022505, 72.571362),
+    ('Vadodara City Centre',    'VAD', (SELECT branch_id FROM branch WHERE branch_name = 'Surat Central Hub'), ROW('Sayajigunj', 'Vadodara', 'Gujarat', '390005')::address_t, 22.307159, 73.181219),
+    ('Rajkot Regional Branch',  'RAJ', (SELECT branch_id FROM branch WHERE branch_name = 'Surat Central Hub'), ROW('Kotecha Chowk', 'Rajkot', 'Gujarat', '360001')::address_t, 22.303894, 70.802160),
+    ('Surat Adajan Centre',     'SUR', (SELECT branch_id FROM branch WHERE branch_name = 'Surat Central Hub'), ROW('Adajan Gam', 'Surat', 'Gujarat', '395009')::address_t, 21.195900, 72.793300)
 ON CONFLICT (branch_name) DO NOTHING;
 
 -- 2) Hospitals
@@ -33,9 +36,9 @@ ON CONFLICT (hospital_name, region_code) DO NOTHING;
 -- 3) Demo Staff Accounts (Password for all: Test@1234 -> $2a$10$HTZ2nTOWcPwKUSfPAqUMB.EamOtziiyQrhxFOJs7/l36wQXj27NA.)
 INSERT INTO app_user (email, password_hash, full_name, role_name, branch_id, hospital_id, is_active) VALUES
     ('admin@bb.test',    '$2a$10$HTZ2nTOWcPwKUSfPAqUMB.EamOtziiyQrhxFOJs7/l36wQXj27NA.', 'Asha Patel', 'admin', NULL, NULL, true),
-    ('officer@bb.test',  '$2a$10$HTZ2nTOWcPwKUSfPAqUMB.EamOtziiyQrhxFOJs7/l36wQXj27NA.', 'Raman Joshi', 'bb_officer', 1, NULL, true),
-    ('lab@bb.test',      '$2a$10$HTZ2nTOWcPwKUSfPAqUMB.EamOtziiyQrhxFOJs7/l36wQXj27NA.', 'Dr. Suresh Mehta', 'lab_tech', 1, NULL, true),
-    ('hospital@bb.test', '$2a$10$HTZ2nTOWcPwKUSfPAqUMB.EamOtziiyQrhxFOJs7/l36wQXj27NA.', 'Surat Civil Desk', 'hospital_user', NULL, 1, true),
+    ('officer@bb.test',  '$2a$10$HTZ2nTOWcPwKUSfPAqUMB.EamOtziiyQrhxFOJs7/l36wQXj27NA.', 'Raman Joshi', 'bb_officer', (SELECT branch_id FROM branch WHERE branch_name = 'Surat Central Hub'), NULL, true),
+    ('lab@bb.test',      '$2a$10$HTZ2nTOWcPwKUSfPAqUMB.EamOtziiyQrhxFOJs7/l36wQXj27NA.', 'Dr. Suresh Mehta', 'lab_tech', (SELECT branch_id FROM branch WHERE branch_name = 'Surat Central Hub'), NULL, true),
+    ('hospital@bb.test', '$2a$10$HTZ2nTOWcPwKUSfPAqUMB.EamOtziiyQrhxFOJs7/l36wQXj27NA.', 'Surat Civil Desk', 'hospital_user', NULL, (SELECT hospital_id FROM hospital WHERE hospital_name = 'Surat New Civil Hospital'), true),
     ('auditor@bb.test',  '$2a$10$HTZ2nTOWcPwKUSfPAqUMB.EamOtziiyQrhxFOJs7/l36wQXj27NA.', 'Priya Desai', 'auditor', NULL, NULL, true)
 ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash;
 

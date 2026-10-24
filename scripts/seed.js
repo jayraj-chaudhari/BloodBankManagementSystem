@@ -41,21 +41,31 @@ async function seedDatabase() {
 
     // 2. Insert Branches (5 branches across Gujarat: 1 regional hub + 4 local centres)
     console.log('Inserting branches...');
-    const branches = [
-      { name: 'Surat Central Hub', region: 'SUR', parent: null, lat: 21.170240, lon: 72.831061, line1: 'Ring Road', city: 'Surat' },
-      { name: 'Ahmedabad Civil Branch', region: 'AHM', parent: 1, lat: 23.022505, lon: 72.571362, line1: 'Asarwa', city: 'Ahmedabad' },
-      { name: 'Vadodara City Centre', region: 'VAD', parent: 1, lat: 22.307159, lon: 73.181219, line1: 'Sayajigunj', city: 'Vadodara' },
-      { name: 'Rajkot Regional Branch', region: 'RAJ', parent: 1, lat: 22.303894, lon: 70.802160, line1: 'Kotecha Chowk', city: 'Rajkot' },
-      { name: 'Surat Adajan Centre', region: 'SUR', parent: 1, lat: 21.195900, lon: 72.793300, line1: 'Adajan Gam', city: 'Surat' }
+    const hubRes = await client.query(`
+      INSERT INTO branch (branch_name, region_code, parent_branch_id, address, latitude, longitude)
+      VALUES ($1, $2, NULL, ROW($3, $4, 'Gujarat', '395001')::address_t, $5, $6)
+      ON CONFLICT (branch_name) DO UPDATE SET region_code = EXCLUDED.region_code
+      RETURNING branch_id;
+    `, ['Surat Central Hub', 'SUR', 'Ring Road', 'Surat', 21.170240, 72.831061]);
+    const hubBranchId = hubRes.rows[0].branch_id;
+
+    const childBranches = [
+      { name: 'Ahmedabad Civil Branch', region: 'AHM', lat: 23.022505, lon: 72.571362, line1: 'Asarwa', city: 'Ahmedabad' },
+      { name: 'Vadodara City Centre', region: 'VAD', lat: 22.307159, lon: 73.181219, line1: 'Sayajigunj', city: 'Vadodara' },
+      { name: 'Rajkot Regional Branch', region: 'RAJ', lat: 22.303894, lon: 70.802160, line1: 'Kotecha Chowk', city: 'Rajkot' },
+      { name: 'Surat Adajan Centre', region: 'SUR', lat: 21.195900, lon: 72.793300, line1: 'Adajan Gam', city: 'Surat' }
     ];
 
-    for (const b of branches) {
+    for (const b of childBranches) {
       await client.query(`
         INSERT INTO branch (branch_name, region_code, parent_branch_id, address, latitude, longitude)
         VALUES ($1, $2, $3, ROW($4, $5, 'Gujarat', '395001')::address_t, $6, $7)
-        ON CONFLICT (branch_name) DO NOTHING;
-      `, [b.name, b.region, b.parent, b.line1, b.city, b.lat, b.lon]);
+        ON CONFLICT (branch_name) DO UPDATE SET parent_branch_id = EXCLUDED.parent_branch_id;
+      `, [b.name, b.region, hubBranchId, b.line1, b.city, b.lat, b.lon]);
     }
+
+    const branchRows = await client.query(`SELECT branch_id FROM branch`);
+    const branchIds = branchRows.rows.map(r => r.branch_id);
 
     // 3. Insert Hospitals (8 hospitals)
     console.log('Inserting hospitals...');
@@ -78,13 +88,16 @@ async function seedDatabase() {
       `, [h.name, h.region, h.phone, h.lat, h.lon]);
     }
 
+    const hospitalRows = await client.query(`SELECT hospital_id FROM hospital`);
+    const hospitalIds = hospitalRows.rows.map(r => r.hospital_id);
+
     // 4. Insert Demo Accounts
     console.log('Inserting demo staff and user accounts (Password: Test@1234)...');
     const demoAccounts = [
       { email: 'admin@bb.test', name: 'Asha Patel (Admin)', role: 'admin', branch_id: null, hospital_id: null },
-      { email: 'officer@bb.test', name: 'Raman Joshi (Officer)', role: 'bb_officer', branch_id: 1, hospital_id: null },
-      { email: 'lab@bb.test', name: 'Dr. Suresh Mehta (Lab Tech)', role: 'lab_tech', branch_id: 1, hospital_id: null },
-      { email: 'hospital@bb.test', name: 'Surat Civil Desk (Hospital Staff)', role: 'hospital_user', branch_id: null, hospital_id: 1 },
+      { email: 'officer@bb.test', name: 'Raman Joshi (Officer)', role: 'bb_officer', branch_id: hubBranchId, hospital_id: null },
+      { email: 'lab@bb.test', name: 'Dr. Suresh Mehta (Lab Tech)', role: 'lab_tech', branch_id: hubBranchId, hospital_id: null },
+      { email: 'hospital@bb.test', name: 'Surat Civil Desk (Hospital Staff)', role: 'hospital_user', branch_id: null, hospital_id: hospitalIds[0] },
       { email: 'auditor@bb.test', name: 'Priya Desai (Auditor)', role: 'auditor', branch_id: null, hospital_id: null }
     ];
 
@@ -92,7 +105,7 @@ async function seedDatabase() {
       await client.query(`
         INSERT INTO app_user (email, password_hash, full_name, role_name, branch_id, hospital_id, is_active)
         VALUES ($1, $2, $3, $4, $5, $6, true)
-        ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash;
+        ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash, branch_id = EXCLUDED.branch_id, hospital_id = EXCLUDED.hospital_id;
       `, [acc.email, demoPasswordHash, acc.name, acc.role, acc.branch_id, acc.hospital_id]);
     }
 
@@ -182,7 +195,7 @@ async function seedDatabase() {
             INSERT INTO donation (donor_id, branch_id, donated_at, volume_ml, hemoglobin_gdl, collected_by)
             VALUES ($1, $2, now() - make_interval(days => $3), $4, $5, $6)
             RETURNING donation_id, donated_at;
-          `, [did, randInt(1, 5), daysAgo, volume, hgb, officerId]);
+          `, [did, choose(branchIds), daysAgo, volume, hgb, officerId]);
 
           const donationId = donRes.rows[0].donation_id;
           const donatedAt = donRes.rows[0].donated_at;
@@ -238,7 +251,7 @@ async function seedDatabase() {
       const units = randInt(1, 4);
       const urgency = choose(['ROUTINE', 'ROUTINE', 'URGENT', 'EMERGENCY']);
       const status = choose(['PENDING', 'PENDING', 'APPROVED', 'FULFILLED']);
-      const hospId = randInt(1, 8);
+      const hospId = choose(hospitalIds);
       const patientRef = `PT-${randInt(10000, 99999)}`;
 
       const reqRes = await client.query(`

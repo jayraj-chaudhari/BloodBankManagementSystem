@@ -5,6 +5,7 @@ const { withContext } = require('../middleware/withContext');
 const validate = require('../middleware/validate');
 const { createRequestSchema, updateRequestStatusSchema } = require('../validators/schemas');
 const { audit } = require('../services/auditService');
+const { emitRequestCreated, emitInventoryUpdate } = require('../services/socketService');
 
 // POST /api/v1/requests (hospital_user, bb_officer, admin)
 router.post('/', authenticate, authorizeRoles('hospital_user', 'bb_officer', 'admin'), validate(createRequestSchema), async (req, res, next) => {
@@ -49,6 +50,16 @@ router.post('/', authenticate, authorizeRoles('hospital_user', 'bb_officer', 'ad
       blood_group,
       component,
       units_needed
+    });
+
+    // Real-time Socket.IO emission
+    emitRequestCreated({
+      request_id: row.request_id,
+      hospital_id: row.hospital_id,
+      blood_group: row.blood_group,
+      component: row.component,
+      units_needed: row.units_needed,
+      urgency: row.urgency
     });
 
     return res.status(201).json({
@@ -195,7 +206,6 @@ router.post('/:request_id/allocate', authenticate, authorizeRoles('bb_officer', 
     }
 
     const allocatedCount = await withContext(req.user, async (client) => {
-      // Execute the database procedure fn_allocate_fefo
       const procRes = await client.query(
         `SELECT fn_allocate_fefo($1, $2) AS count`,
         [requestId, req.user.user_id]
@@ -205,6 +215,13 @@ router.post('/:request_id/allocate', authenticate, authorizeRoles('bb_officer', 
 
     await audit(req, 'UNIT_ALLOCATED', 'blood_request', requestId, {
       allocated_count: allocatedCount
+    });
+
+    // Real-time inventory broadcast
+    emitInventoryUpdate({
+      action: 'FEFO_ALLOCATION',
+      request_id: requestId,
+      allocated_units: Number(allocatedCount)
     });
 
     return res.status(200).json({
@@ -229,7 +246,6 @@ router.patch('/:request_id/status', authenticate, validate(updateRequestStatusSc
 
     const { status } = req.body;
 
-    // Hospital user restriction: can only CANCEL their own PENDING request
     if (req.user.role === 'hospital_user') {
       if (status !== 'CANCELLED') {
         return res.status(403).json({

@@ -6,6 +6,7 @@ const { authenticate, authorizeRoles } = require('../middleware/auth');
 const validate = require('../middleware/validate');
 const { createUserSchema } = require('../validators/schemas');
 const { audit } = require('../services/auditService');
+const { emitInventoryUpdate } = require('../services/socketService');
 
 // POST /api/v1/admin/users (admin only)
 router.post('/users', authenticate, authorizeRoles('admin'), validate(createUserSchema), async (req, res, next) => {
@@ -13,9 +14,6 @@ router.post('/users', authenticate, authorizeRoles('admin'), validate(createUser
     const { email, password, full_name, role_name, branch_id, hospital_id } = req.body;
     const cleanEmail = email.trim().toLowerCase();
 
-    // Validate role affiliation constraints from database contract:
-    // hospital_user requires hospital_id
-    // bb_officer & lab_tech require branch_id
     if (role_name === 'hospital_user' && !hospital_id) {
       return res.status(400).json({
         error: {
@@ -66,7 +64,6 @@ router.post('/expire-units', authenticate, authorizeRoles('admin', 'bb_officer')
       const procRes = await pool.query(`SELECT fn_expire_units() AS count`);
       expiredCount = procRes.rows[0]?.count || 0;
     } catch (procErr) {
-      // Fallback if stored function is not yet created
       const updateRes = await pool.query(
         `UPDATE blood_unit
             SET status = 'EXPIRED'
@@ -79,6 +76,12 @@ router.post('/expire-units', authenticate, authorizeRoles('admin', 'bb_officer')
     await audit(req, 'UNIT_STATUS_CHANGED', 'blood_unit', null, {
       action: 'expire_sweep',
       expired_count: expiredCount
+    });
+
+    // Real-time inventory broadcast
+    emitInventoryUpdate({
+      action: 'EXPIRE_SWEEP',
+      expired_count: Number(expiredCount)
     });
 
     return res.status(200).json({

@@ -8,11 +8,16 @@ export default defineConfig({
     proxy: {
       '/api': {
         target: 'http://localhost:3000',
-        changeOrigin: true
-      },
-      '/socket.io': {
-        target: 'http://localhost:3000',
-        ws: true
+        changeOrigin: true,
+        configure: (proxy) => {
+          proxy.on('error', (err, req, res) => {
+            // Gracefully handle backend startup or temporary connection resets
+            if (!res.headersSent && res.writeHead) {
+              res.writeHead(502, { 'Content-Type': 'application/json' });
+              res.end(JSON.stringify({ error: { code: 'BACKEND_OFFLINE', message: 'Backend server is not running on port 3000' } }));
+            }
+          });
+        }
       }
     }
   }

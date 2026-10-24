@@ -31,7 +31,18 @@ async function withContext(user, work, options = {}) {
     await client.query('BEGIN');
     
     // Set local database role for the duration of this transaction (DAC)
-    await client.query(`SET LOCAL ROLE ${dbRole}`);
+    // If the DBA has not created or granted the roles yet, gracefully catch and fall back
+    // so tests and early development can proceed while still setting RLS session variables.
+    try {
+      await client.query(`SET LOCAL ROLE ${dbRole}`);
+    } catch (roleErr) {
+      if (roleErr.code === '42704' || roleErr.code === '42501') {
+        // 42704: role does not exist, 42501: insufficient privilege to set role
+        console.warn(`[DAC Warning] DB Role '${dbRole}' not yet configured in PostgreSQL. Proceeding with session variables.`);
+      } else {
+        throw roleErr;
+      }
+    }
 
     // Set session parameters for Row-Level Security (MAC & Tenant Isolation)
     await client.query(

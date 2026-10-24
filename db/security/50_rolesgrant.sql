@@ -143,6 +143,7 @@ GRANT SELECT ON v_donor_eligibility TO bb_admin, bb_officer, bb_lab_tech, bb_don
 GRANT SELECT ON v_request_summary  TO bb_admin, bb_officer, bb_hospital, bb_auditor;
 
 GRANT EXECUTE ON FUNCTION fn_allocate_fefo(int, int) TO bb_officer;
+GRANT EXECUTE ON FUNCTION fn_find_donors_for_request(int, numeric) TO bb_admin, bb_officer;
 GRANT EXECUTE ON FUNCTION fn_expire_units()          TO bb_admin, bb_officer;
 
 -- Smoke test: expect 12 rows (6 group roles + bb_app + bb_owner... see tests file for the real check)

@@ -166,3 +166,41 @@ FROM pg_proc
 WHERE pronamespace = 'public'::regnamespace
   AND proname IN ('fn_allocate_fefo', 'fn_expire_units', 'fn_register_donor')
 ORDER BY proname;
+-- 4) Emergency donor search within radius (Haversine, pure SQL)
+CREATE FUNCTION fn_find_donors_for_request(p_request_id int, p_radius_km numeric DEFAULT 50.0)
+RETURNS TABLE (donor_id int, blood_group blood_group_t, distance_km numeric, is_available boolean, next_eligible_on date)
+LANGUAGE plpgsql STABLE
+SET search_path = pg_catalog, public
+AS 
+DECLARE
+    v_req  blood_request%ROWTYPE;
+    v_hosp hospital%ROWTYPE;
+BEGIN
+    SELECT * INTO v_req FROM blood_request WHERE request_id = p_request_id;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'NOT_FOUND: request % does not exist', p_request_id;
+    END IF;
+
+    SELECT * INTO v_hosp FROM hospital WHERE hospital_id = v_req.hospital_id;
+    IF v_hosp.latitude IS NULL OR v_hosp.longitude IS NULL THEN
+        RAISE EXCEPTION 'VALIDATION_ERROR: hospital has no geographic coordinates';
+    END IF;
+
+    RETURN QUERY
+    SELECT dn.donor_id,
+           dn.blood_group,
+           fn_distance_km(v_hosp.latitude::float8, v_hosp.longitude::float8, dn.latitude::float8, dn.longitude::float8) AS distance_km,
+           e.is_available,
+           e.next_eligible_on
+      FROM donor dn
+      JOIN v_donor_eligibility e ON e.donor_id = dn.donor_id
+     WHERE dn.latitude IS NOT NULL AND dn.longitude IS NOT NULL
+       AND e.is_eligible = true
+       AND e.is_available = true
+       AND dn.blood_group = ANY (fn_compatible_donor_groups(v_req.blood_group, v_req.component))
+       AND fn_distance_km(v_hosp.latitude::float8, v_hosp.longitude::float8, dn.latitude::float8, dn.longitude::float8) <= p_radius_km
+     ORDER BY distance_km ASC;
+END;
+;
+
+COMMENT ON FUNCTION fn_find_donors_for_request(int, numeric) IS 'Find eligible and available donors for an emergency blood request within a given radius (km), nearest first.';

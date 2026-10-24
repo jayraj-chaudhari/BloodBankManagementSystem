@@ -1,4 +1,8 @@
-const { Pool } = require('pg');
+const { Pool, types } = require('pg');
+
+// Contract requirement: pg returns NUMERIC and BIGINT as strings. Convert with Number() before JSON.
+types.setTypeParser(1700, (val) => val === null ? null : Number(val));
+types.setTypeParser(20, (val) => val === null ? null : (Number.isSafeInteger(Number(val)) ? Number(val) : val));
 const config = require('../config');
 
 // Pool for application API requests (connecting as bb_app)

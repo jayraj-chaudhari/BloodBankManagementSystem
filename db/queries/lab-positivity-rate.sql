@@ -1,0 +1,1 @@
+SELECT s.test_type, count(*)::int AS total_tests, count(CASE WHEN s.result = 'POSITIVE' THEN 1 END)::int AS positive_count, round((count(CASE WHEN s.result = 'POSITIVE' THEN 1 END)::numeric / NULLIF(count(*), 0) * 100), 2) AS positivity_percentage FROM screening_result s GROUP BY s.test_type ORDER BY s.test_type;

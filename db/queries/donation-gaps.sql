@@ -1,0 +1,1 @@
+SELECT d.donor_id, d.donation_id, d.donated_at::date AS current_donation, lag(d.donated_at::date) OVER (PARTITION BY d.donor_id ORDER BY d.donated_at) AS previous_donation, d.donated_at::date - lag(d.donated_at::date) OVER (PARTITION BY d.donor_id ORDER BY d.donated_at) AS days_between_donations FROM donation d ORDER BY d.donor_id, d.donated_at;

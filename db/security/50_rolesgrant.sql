@@ -52,6 +52,25 @@ REVOKE ALL ON FUNCTION fn_auth_lookup(text)               FROM PUBLIC;
 REVOKE ALL ON FUNCTION fn_auth_record_attempt(int, boolean) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION fn_auth_lookup(text)               TO bb_app;
 GRANT EXECUTE ON FUNCTION fn_auth_record_attempt(int, boolean) TO bb_app;
+
+CREATE FUNCTION fn_auth_lookup_by_id(p_user_id int)
+RETURNS TABLE (user_id int, email text, full_name text, role_name text,
+               clearance smallint, branch_id int, hospital_id int, donor_id int,
+               is_active boolean)
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = pg_catalog, public
+AS 
+    SELECT u.user_id, u.email, u.full_name, u.role_name, r.clearance,
+           u.branch_id, u.hospital_id, d.donor_id, u.is_active
+      FROM app_user u
+      JOIN role_def r   ON r.role_name = u.role_name
+      LEFT JOIN donor d ON d.user_id   = u.user_id
+     WHERE u.user_id = p_user_id
+;
+
+REVOKE ALL ON FUNCTION fn_auth_lookup_by_id(int)               FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION fn_auth_lookup_by_id(int)           TO bb_app;
+
 GRANT EXECUTE ON FUNCTION fn_register_donor(text, text, text, date, char, blood_group_t,
                                             numeric, char, numeric, numeric, text, text) TO bb_app;
 
@@ -120,7 +139,7 @@ GRANT SELECT ON stock_movement TO bb_admin, bb_officer, bb_lab_tech, bb_auditor;
 -- 7) Views and actions ----------------------------------------------------------------------------------
 GRANT SELECT ON v_public_inventory TO bb_admin, bb_officer, bb_lab_tech, bb_hospital, bb_donor, bb_auditor;
 GRANT SELECT ON v_inventory        TO bb_admin, bb_officer, bb_lab_tech, bb_auditor;
-GRANT SELECT ON v_donor_eligibility TO bb_officer;
+GRANT SELECT ON v_donor_eligibility TO bb_admin, bb_officer, bb_lab_tech, bb_donor, bb_auditor;
 GRANT SELECT ON v_request_summary  TO bb_admin, bb_officer, bb_hospital, bb_auditor;
 
 GRANT EXECUTE ON FUNCTION fn_allocate_fefo(int, int) TO bb_officer;

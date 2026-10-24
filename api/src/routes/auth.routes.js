@@ -254,25 +254,11 @@ router.post('/login', validate(loginSchema), async (req, res, next) => {
 router.get('/me', authenticate, async (req, res, next) => {
   try {
     let user = null;
-    try {
-      const lookupRes = await pool.query(
-        `SELECT user_id, full_name, role_name, clearance, branch_id, hospital_id, donor_id
-           FROM fn_auth_lookup($1)`,
-        [req.user.user_id]
-      );
-      if (lookupRes.rows.length > 0) user = lookupRes.rows[0];
-    } catch (e) {
-      const userRes = await pool.query(
-        `SELECT u.user_id, u.email, u.full_name, u.role_name, u.branch_id, u.hospital_id,
-                COALESCE(r.clearance, 1) AS clearance, d.donor_id
-           FROM app_user u
-      LEFT JOIN role_def r ON r.role_name = u.role_name
-      LEFT JOIN donor d ON d.user_id = u.user_id
-          WHERE u.user_id = $1`,
-        [req.user.user_id]
-      );
-      if (userRes.rows.length > 0) user = userRes.rows[0];
-    }
+    const lookupRes = await pool.query(
+      `SELECT user_id, email, full_name, role_name, clearance, branch_id, hospital_id, donor_id, is_active FROM fn_auth_lookup_by_id($1)`,
+      [req.user.user_id]
+    );
+    if (lookupRes.rows.length > 0) user = lookupRes.rows[0];
 
     if (!user) {
       return res.status(404).json({

@@ -21,19 +21,7 @@ router.get('/me', authenticate, authorizeRoles('donor'), async (req, res, next) 
      LEFT JOIN v_donor_eligibility v ON v.donor_id = d.donor_id
          WHERE d.user_id = $1
       `;
-      try {
-        return await client.query(q, [req.user.user_id]);
-      } catch (e) {
-        // Fallback without view
-        return await client.query(`
-          SELECT d.donor_id, d.user_id, d.date_of_birth, d.gender, d.blood_group,
-                 d.weight_kg, d.region_code, d.latitude, d.longitude, d.is_available,
-                 u.full_name, u.email
-            FROM donor d
-            JOIN app_user u ON u.user_id = d.user_id
-           WHERE d.user_id = $1
-        `, [req.user.user_id]);
-      }
+      return await client.query(q, [req.user.user_id]);
     });
 
     if (result.rows.length === 0) {
@@ -89,7 +77,6 @@ router.get('/', authenticate, authorizeRoles('bb_officer', 'admin', 'lab_tech'),
         extraWhere = ' AND (v.is_eligible = true OR v.is_eligible IS NULL)';
       }
 
-      try {
         const countRes = await client.query(`
           SELECT count(d.donor_id)::int AS total
             FROM donor d
@@ -111,22 +98,6 @@ router.get('/', authenticate, authorizeRoles('bb_officer', 'admin', 'lab_tech'),
         `, [...params, limit, offset]);
 
         return { total: countRes.rows[0].total, rows: dataRes.rows };
-      } catch (viewErr) {
-        // Fallback without v_donor_eligibility view
-        const countRes = await client.query(`SELECT count(*)::int AS total FROM donor d ${whereClause}`, params);
-        const dataRes = await client.query(`
-          SELECT d.donor_id, d.user_id, d.date_of_birth, d.gender, d.blood_group,
-                 d.weight_kg, d.region_code, d.latitude, d.longitude, d.is_available,
-                 d.created_at, u.full_name, u.email
-            FROM donor d
-            JOIN app_user u ON u.user_id = d.user_id
-          ${whereClause}
-           ORDER BY d.donor_id DESC
-           LIMIT $${params.length + 1} OFFSET $${params.length + 2}
-        `, [...params, limit, offset]);
-
-        return { total: countRes.rows[0].total, rows: dataRes.rows };
-      }
     });
 
     return res.status(200).json({
@@ -151,7 +122,6 @@ router.get('/:donor_id', authenticate, authorizeRoles('bb_officer', 'admin', 'la
     }
 
     const result = await withContext(req.user, async (client) => {
-      try {
         return await client.query(
           `SELECT d.donor_id, d.user_id, d.date_of_birth, d.gender, d.blood_group,
                   d.weight_kg, d.region_code, d.latitude, d.longitude, d.is_available,
@@ -163,17 +133,6 @@ router.get('/:donor_id', authenticate, authorizeRoles('bb_officer', 'admin', 'la
             WHERE d.donor_id = $1`,
           [donorId]
         );
-      } catch (viewErr) {
-        return await client.query(
-          `SELECT d.donor_id, d.user_id, d.date_of_birth, d.gender, d.blood_group,
-                  d.weight_kg, d.region_code, d.latitude, d.longitude, d.is_available,
-                  d.created_at, u.full_name, u.email
-             FROM donor d
-             JOIN app_user u ON u.user_id = d.user_id
-            WHERE d.donor_id = $1`,
-          [donorId]
-        );
-      }
     });
 
     if (result.rows.length === 0) {
@@ -206,7 +165,6 @@ router.get('/:donor_id/contact', authenticate, async (req, res, next) => {
     }
 
     const result = await withContext(req.user, async (client) => {
-      try {
         return await client.query(
           `SELECT donor_id,
                   fn_decrypt_text(phone_enc) AS phone,
@@ -217,18 +175,6 @@ router.get('/:donor_id/contact', authenticate, async (req, res, next) => {
             WHERE donor_id = $1`,
           [donorId]
         );
-      } catch (decErr) {
-        return await client.query(
-          `SELECT donor_id,
-                  pgp_sym_decrypt(phone_enc, current_setting('app.enc_key', true)) AS phone,
-                  pgp_sym_decrypt(email_enc, current_setting('app.enc_key', true)) AS email,
-                  pgp_sym_decrypt(address_enc, current_setting('app.enc_key', true)) AS address,
-                  key_version, updated_at
-             FROM donor_contact
-            WHERE donor_id = $1`,
-          [donorId]
-        );
-      }
     }, { withEncKey: true });
 
     if (result.rows.length === 0) {

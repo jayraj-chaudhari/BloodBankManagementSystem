@@ -30,18 +30,18 @@ INSERT INTO hospital (hospital_name, region_code, address, phone, latitude, long
     ('Wockhardt Hospital Rajkot',        'RAJ', ROW('Kalawad Road', 'Rajkot', 'Gujarat', '360007')::address_t,'9825000008', 22.2880, 70.7810, true)
 ON CONFLICT (hospital_name, region_code) DO NOTHING;
 
--- 3) Demo Staff Accounts (Password for all: Test@1234 -> $2a$10$wK1F5nO8YJ15d/N.j4vQ1.nKSp2xYwYtXpY9gC/8tYn05M7Yg7W92)
+-- 3) Demo Staff Accounts (Password for all: Test@1234 -> $2a$10$HTZ2nTOWcPwKUSfPAqUMB.EamOtziiyQrhxFOJs7/l36wQXj27NA.)
 INSERT INTO app_user (email, password_hash, full_name, role_name, branch_id, hospital_id, is_active) VALUES
-    ('admin@bb.test',    '$2a$10$wK1F5nO8YJ15d/N.j4vQ1.nKSp2xYwYtXpY9gC/8tYn05M7Yg7W92', 'Asha Patel', 'admin', NULL, NULL, true),
-    ('officer@bb.test',  '$2a$10$wK1F5nO8YJ15d/N.j4vQ1.nKSp2xYwYtXpY9gC/8tYn05M7Yg7W92', 'Raman Joshi', 'bb_officer', 1, NULL, true),
-    ('lab@bb.test',      '$2a$10$wK1F5nO8YJ15d/N.j4vQ1.nKSp2xYwYtXpY9gC/8tYn05M7Yg7W92', 'Dr. Suresh Mehta', 'lab_tech', 1, NULL, true),
-    ('hospital@bb.test', '$2a$10$wK1F5nO8YJ15d/N.j4vQ1.nKSp2xYwYtXpY9gC/8tYn05M7Yg7W92', 'Surat Civil Desk', 'hospital_user', NULL, 1, true),
-    ('auditor@bb.test',  '$2a$10$wK1F5nO8YJ15d/N.j4vQ1.nKSp2xYwYtXpY9gC/8tYn05M7Yg7W92', 'Priya Desai', 'auditor', NULL, NULL, true)
+    ('admin@bb.test',    '$2a$10$HTZ2nTOWcPwKUSfPAqUMB.EamOtziiyQrhxFOJs7/l36wQXj27NA.', 'Asha Patel', 'admin', NULL, NULL, true),
+    ('officer@bb.test',  '$2a$10$HTZ2nTOWcPwKUSfPAqUMB.EamOtziiyQrhxFOJs7/l36wQXj27NA.', 'Raman Joshi', 'bb_officer', 1, NULL, true),
+    ('lab@bb.test',      '$2a$10$HTZ2nTOWcPwKUSfPAqUMB.EamOtziiyQrhxFOJs7/l36wQXj27NA.', 'Dr. Suresh Mehta', 'lab_tech', 1, NULL, true),
+    ('hospital@bb.test', '$2a$10$HTZ2nTOWcPwKUSfPAqUMB.EamOtziiyQrhxFOJs7/l36wQXj27NA.', 'Surat Civil Desk', 'hospital_user', NULL, 1, true),
+    ('auditor@bb.test',  '$2a$10$HTZ2nTOWcPwKUSfPAqUMB.EamOtziiyQrhxFOJs7/l36wQXj27NA.', 'Priya Desai', 'auditor', NULL, NULL, true)
 ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash;
 
 -- 4) Primary Demo Donor (donor1@bb.test)
 INSERT INTO app_user (email, password_hash, full_name, role_name) VALUES
-    ('donor1@bb.test', '$2a$10$wK1F5nO8YJ15d/N.j4vQ1.nKSp2xYwYtXpY9gC/8tYn05M7Yg7W92', 'Rajesh Kumar', 'donor')
+    ('donor1@bb.test', '$2a$10$HTZ2nTOWcPwKUSfPAqUMB.EamOtziiyQrhxFOJs7/l36wQXj27NA.', 'Rajesh Kumar', 'donor')
 ON CONFLICT (email) DO UPDATE SET password_hash = EXCLUDED.password_hash;
 
 INSERT INTO donor (user_id, date_of_birth, gender, blood_group, weight_kg, region_code, latitude, longitude, is_available) VALUES
@@ -63,7 +63,7 @@ DECLARE
 BEGIN
     -- Donor 2: B+ Female
     INSERT INTO app_user (email, password_hash, full_name, role_name)
-    VALUES ('donor2@bb.test', '$2a$10$wK1F5nO8YJ15d/N.j4vQ1.nKSp2xYwYtXpY9gC/8tYn05M7Yg7W92', 'Ananya Sharma', 'donor')
+    VALUES ('donor2@bb.test', '$2a$10$HTZ2nTOWcPwKUSfPAqUMB.EamOtziiyQrhxFOJs7/l36wQXj27NA.', 'Ananya Sharma', 'donor')
     ON CONFLICT (email) DO UPDATE SET full_name = EXCLUDED.full_name RETURNING user_id INTO v_uid;
 
     INSERT INTO donor (user_id, date_of_birth, gender, blood_group, weight_kg, region_code, latitude, longitude, is_available)
@@ -78,7 +78,7 @@ BEGIN
 
     -- Donor 3: A- Male (Universal Platelet/Plasma source)
     INSERT INTO app_user (email, password_hash, full_name, role_name)
-    VALUES ('donor3@bb.test', '$2a$10$wK1F5nO8YJ15d/N.j4vQ1.nKSp2xYwYtXpY9gC/8tYn05M7Yg7W92', 'Vikram Solanki', 'donor')
+    VALUES ('donor3@bb.test', '$2a$10$HTZ2nTOWcPwKUSfPAqUMB.EamOtziiyQrhxFOJs7/l36wQXj27NA.', 'Vikram Solanki', 'donor')
     ON CONFLICT (email) DO UPDATE SET full_name = EXCLUDED.full_name RETURNING user_id INTO v_uid;
 
     INSERT INTO donor (user_id, date_of_birth, gender, blood_group, weight_kg, region_code, latitude, longitude, is_available)
@@ -93,7 +93,7 @@ BEGIN
 
     -- Donor 4: AB+ Male (Universal Plasma Donor)
     INSERT INTO app_user (email, password_hash, full_name, role_name)
-    VALUES ('donor4@bb.test', '$2a$10$wK1F5nO8YJ15d/N.j4vQ1.nKSp2xYwYtXpY9gC/8tYn05M7Yg7W92', 'Pooja Trivedi', 'donor')
+    VALUES ('donor4@bb.test', '$2a$10$HTZ2nTOWcPwKUSfPAqUMB.EamOtziiyQrhxFOJs7/l36wQXj27NA.', 'Pooja Trivedi', 'donor')
     ON CONFLICT (email) DO UPDATE SET full_name = EXCLUDED.full_name RETURNING user_id INTO v_uid;
 
     INSERT INTO donor (user_id, date_of_birth, gender, blood_group, weight_kg, region_code, latitude, longitude, is_available)

@@ -5,6 +5,7 @@ const { withContext } = require('../middleware/withContext');
 const validate = require('../middleware/validate');
 const { createAlertSchema, respondAlertSchema } = require('../validators/schemas');
 const { audit } = require('../services/auditService');
+const { emitEmergencyAlert, emitAlertResponse } = require('../services/socketService');
 
 // POST /api/v1/requests/:request_id/alerts (officer only)
 router.post('/requests/:request_id/alerts', authenticate, authorizeRoles('bb_officer', 'admin'), validate(createAlertSchema), async (req, res, next) => {
@@ -15,11 +16,13 @@ router.post('/requests/:request_id/alerts', authenticate, authorizeRoles('bb_off
     }
 
     const { radius_km, max_donors } = req.body;
+    let requestMeta = null;
 
     const createdAlerts = await withContext(req.user, async (client) => {
       // 1. Get request and hospital location
       const reqRes = await client.query(`
-        SELECT r.request_id, r.blood_group, r.component, h.latitude, h.longitude, r.status
+        SELECT r.request_id, r.blood_group, r.component, r.urgency,
+               h.hospital_name, h.latitude, h.longitude, r.status
           FROM blood_request r
           JOIN hospital h ON h.hospital_id = r.hospital_id
          WHERE r.request_id = $1
@@ -30,6 +33,7 @@ router.post('/requests/:request_id/alerts', authenticate, authorizeRoles('bb_off
       }
 
       const request = reqRes.rows[0];
+      requestMeta = request;
 
       // 2. Find eligible compatible donors within radius_km
       const donorRes = await client.query(`
@@ -71,6 +75,18 @@ router.post('/requests/:request_id/alerts', authenticate, authorizeRoles('bb_off
 
     await audit(req, 'REQUEST_CREATED', 'donor_alert', requestId, {
       alerts_sent: createdAlerts.length,
+      radius_km
+    });
+
+    // Real-time Socket.IO emission
+    emitEmergencyAlert({
+      request_id: requestId,
+      blood_group: requestMeta?.blood_group,
+      component: requestMeta?.component,
+      urgency: requestMeta?.urgency,
+      hospital_name: requestMeta?.hospital_name,
+      alerts_count: createdAlerts.length,
+      donor_ids: createdAlerts.map(a => a.donor_id),
       radius_km
     });
 
@@ -188,6 +204,15 @@ router.post('/alerts/:alert_id/respond', authenticate, authorizeRoles('donor'), 
         }
       });
     }
+
+    // Real-time Socket.IO emission
+    emitAlertResponse({
+      alert_id: row.alert_id,
+      request_id: row.request_id,
+      donor_id: row.donor_id,
+      response: row.response,
+      responded_at: row.responded_at
+    });
 
     return res.status(200).json({ data: row });
   } catch (err) {

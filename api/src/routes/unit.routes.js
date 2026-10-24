@@ -5,6 +5,7 @@ const { withContext } = require('../middleware/withContext');
 const validate = require('../middleware/validate');
 const { updateUnitStatusSchema } = require('../validators/schemas');
 const { audit } = require('../services/auditService');
+const { emitInventoryUpdate } = require('../services/socketService');
 
 // GET /api/v1/units (officer, lab_tech, admin, auditor)
 router.get('/', authenticate, authorizeRoles('bb_officer', 'lab_tech', 'admin', 'auditor'), async (req, res, next) => {
@@ -110,6 +111,15 @@ router.patch('/:unit_id/status', authenticate, authorizeRoles('bb_officer', 'adm
 
     await audit(req, 'UNIT_STATUS_CHANGED', 'blood_unit', unitId, {
       new_status: status
+    });
+
+    // Real-time inventory broadcast
+    emitInventoryUpdate({
+      action: 'UNIT_STATUS_CHANGED',
+      unit_id: row.unit_id,
+      unit_code: row.unit_code,
+      component: row.component,
+      new_status: row.status
     });
 
     return res.status(200).json({

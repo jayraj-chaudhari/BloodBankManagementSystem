@@ -5,6 +5,7 @@ const { withContext } = require('../middleware/withContext');
 const validate = require('../middleware/validate');
 const { createScreeningSchema } = require('../validators/schemas');
 const { audit } = require('../services/auditService');
+const { emitInventoryUpdate } = require('../services/socketService');
 
 // POST /api/v1/screenings (lab_tech only)
 router.post('/', authenticate, authorizeRoles('lab_tech', 'admin'), validate(createScreeningSchema), async (req, res, next) => {
@@ -30,6 +31,14 @@ router.post('/', authenticate, authorizeRoles('lab_tech', 'admin'), validate(cre
       result
     });
 
+    // Real-time inventory update (since negative screening makes units AVAILABLE, positive marks DISCARDED)
+    emitInventoryUpdate({
+      action: 'SCREENING_RESULT_RECORDED',
+      donation_id: row.donation_id,
+      test_type: row.test_type,
+      result: row.result
+    });
+
     return res.status(201).json({
       data: row
     });
@@ -51,7 +60,6 @@ router.get('/', authenticate, async (req, res, next) => {
       return res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'Invalid donation_id' } });
     }
 
-    // Donors can only view screenings for their own donations
     if (req.user.role === 'donor') {
       const isOwner = await withContext(req.user, async (client) => {
         const check = await client.query(

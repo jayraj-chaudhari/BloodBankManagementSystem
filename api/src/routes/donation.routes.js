@@ -6,6 +6,7 @@ const { withContext } = require('../middleware/withContext');
 const validate = require('../middleware/validate');
 const { createDonationSchema } = require('../validators/schemas');
 const { audit } = require('../services/auditService');
+const { emitInventoryUpdate } = require('../services/socketService');
 
 // POST /api/v1/donations (officer only)
 router.post('/', authenticate, authorizeRoles('bb_officer', 'admin'), validate(createDonationSchema), async (req, res, next) => {
@@ -24,12 +25,10 @@ router.post('/', authenticate, authorizeRoles('bb_officer', 'admin'), validate(c
       const donationId = donationRes.rows[0].donation_id;
 
       // 2. Insert blood units for each requested component
-      // Note: trigger trg_unit_set_expiry automatically generates unit_code and expires_on!
       const units = [];
       const unitVolume = Math.floor(volume_ml / components.length);
 
       for (const component of components) {
-        // If trigger is not active, fallback unit code & expiry calculation will take over
         const unitRes = await client.query(
           `INSERT INTO blood_unit (donation_id, component, volume_ml, status, storage_location, expires_on, unit_code)
            VALUES (
@@ -60,6 +59,15 @@ router.post('/', authenticate, authorizeRoles('bb_officer', 'admin'), validate(c
       donor_id,
       branch_id,
       unit_count: result.units.length
+    });
+
+    // Real-time inventory broadcast
+    emitInventoryUpdate({
+      action: 'DONATION_INTAKE',
+      donation_id: result.donation_id,
+      branch_id,
+      units_created: result.units.length,
+      components
     });
 
     return res.status(201).json({

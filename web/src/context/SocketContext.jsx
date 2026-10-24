@@ -4,6 +4,8 @@ import { useAuth } from './AuthContext';
 
 const SocketContext = createContext(null);
 
+const SOCKET_SERVER_URL = 'http://localhost:3000';
+
 export function SocketProvider({ children }) {
   const { token, user } = useAuth();
   const [socket, setSocket] = useState(null);
@@ -12,10 +14,14 @@ export function SocketProvider({ children }) {
   const [lastInventoryEvent, setLastInventoryEvent] = useState(null);
 
   useEffect(() => {
-    // Connect to backend websocket server
-    const newSocket = io(window.location.origin, {
-      transports: ['websocket', 'polling'],
-      autoConnect: true
+    // Connect directly to the Node API server (avoiding fragile Vite ws proxy)
+    const newSocket = io(SOCKET_SERVER_URL, {
+      transports: ['polling', 'websocket'],
+      autoConnect: true,
+      reconnection: true,
+      reconnectionAttempts: 10,
+      reconnectionDelay: 3000,
+      timeout: 5000
     });
 
     newSocket.on('connect', () => {
@@ -26,6 +32,10 @@ export function SocketProvider({ children }) {
     });
 
     newSocket.on('disconnect', () => {
+      setIsConnected(false);
+    });
+
+    newSocket.on('connect_error', () => {
       setIsConnected(false);
     });
 
@@ -48,7 +58,6 @@ export function SocketProvider({ children }) {
     };
   }, [token]);
 
-  // Re-authenticate when user or token updates
   useEffect(() => {
     if (socket && isConnected && token) {
       socket.emit('authenticate', token);

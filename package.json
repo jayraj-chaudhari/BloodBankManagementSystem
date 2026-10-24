@@ -10,7 +10,8 @@
     "web": "npm run dev --prefix web",
     "web:build": "npm run build --prefix web",
     "db:setup": "node scripts/db-setup.js",
-    "db:reset": "node scripts/db-reset.js"
+    "db:reset": "node scripts/db-reset.js",
+    "db:seed": "node scripts/seed.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

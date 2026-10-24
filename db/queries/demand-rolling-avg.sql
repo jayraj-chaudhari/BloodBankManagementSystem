@@ -1,0 +1,1 @@
+WITH daily_demand AS (SELECT created_at::date AS req_date, sum(units_needed)::int AS daily_units FROM blood_request GROUP BY created_at::date) SELECT req_date, daily_units, round(avg(daily_units) OVER (ORDER BY req_date ROWS BETWEEN 6 PRECEDING AND CURRENT ROW), 2) AS rolling_7day_avg FROM daily_demand ORDER BY req_date DESC;

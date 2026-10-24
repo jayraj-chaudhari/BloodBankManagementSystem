@@ -85,6 +85,16 @@ function errorHandler(err, req, res, next) {
         }
       });
     }
+
+    // 23514: check_violation, 22P02: invalid_text_representation (enum / type mismatch)
+    if (err.code === '23514' || err.code === '22P02') {
+      return res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: err.message || 'Check constraint or format validation failed'
+        }
+      });
+    }
   }
 
   // 5. Default 500 internal server error - never leak raw SQL text or sensitive stack

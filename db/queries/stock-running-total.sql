@@ -1,0 +1,1 @@
+SELECT u.created_at::date AS day, dn.blood_group, count(u.unit_id)::int AS daily_units, sum(count(u.unit_id)) OVER (PARTITION BY dn.blood_group ORDER BY u.created_at::date)::int AS running_total FROM blood_unit u JOIN donation d ON d.donation_id = u.donation_id JOIN donor dn ON dn.donor_id = d.donor_id GROUP BY u.created_at::date, dn.blood_group ORDER BY day DESC, dn.blood_group;

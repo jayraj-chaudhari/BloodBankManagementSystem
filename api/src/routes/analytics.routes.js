@@ -134,16 +134,31 @@ router.get('/:name', authenticate, async (req, res, next) => {
     const { name } = req.params;
 
     // Specific role restriction for lab-positivity-rate per spec
+    // Role restrictions strictly matching PostgreSQL DAC/MAC grants:
+    // 1. lab-positivity-rate queries screening_result (classification 3 RESTRICTED: lab_tech only)
     if (name === 'lab-positivity-rate') {
-      if (!['lab_tech', 'auditor', 'admin'].includes(req.user.role)) {
+      if (req.user.role !== 'lab_tech') {
         return res.status(403).json({
           error: {
             code: 'FORBIDDEN',
-            message: 'Only lab technicians, auditors, and administrators may view lab positivity rates'
+            message: 'Only laboratory technicians may view screening results and lab positivity rates (Classification 3 RESTRICTED)'
           }
         });
       }
-    } else {
+    }
+    // 2. donor-ranking queries donor table (officer & admin only; auditors have no grant on donor)
+    else if (name === 'donor-ranking') {
+      if (!['bb_officer', 'admin'].includes(req.user.role)) {
+        return res.status(403).json({
+          error: {
+            code: 'FORBIDDEN',
+            message: 'Auditors and external roles cannot access confidential donor profile tables'
+          }
+        });
+      }
+    }
+    // 3. Other analytics queries require clinical officer, admin, or auditor access
+    else {
       if (!['bb_officer', 'admin', 'auditor'].includes(req.user.role)) {
         return res.status(403).json({
           error: {

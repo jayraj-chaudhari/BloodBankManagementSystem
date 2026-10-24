@@ -23,7 +23,9 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response.data,
   (error) => {
-    if (error.response?.status === 401) {
+    // Do not redirect or wipe storage if the 401 comes from the login request itself
+    const isLoginEndpoint = error.config && error.config.url && error.config.url.includes('/auth/login');
+    if (error.response && error.response.status === 401 && !isLoginEndpoint) {
       // If unauthorized, clear token
       localStorage.removeItem('bb_token');
       localStorage.removeItem('bb_user');

@@ -10,6 +10,21 @@ function computeHash(prevHash, dataObj) {
 }
 
 /**
+ * Safely extracts client IP address from request object
+ */
+function extractIp(req) {
+  if (!req) return '127.0.0.1';
+  if (typeof req.ip === 'string') return req.ip;
+  if (req.headers && req.headers['x-forwarded-for']) {
+    return req.headers['x-forwarded-for'].split(',')[0].trim();
+  }
+  if (req.socket && req.socket.remoteAddress) {
+    return req.socket.remoteAddress;
+  }
+  return '127.0.0.1';
+}
+
+/**
  * Writes an immutable, hash-chained audit entry into MongoDB
  */
 async function audit(req, action, resource, resourceId = null, details = {}, success = true) {
@@ -23,9 +38,9 @@ async function audit(req, action, resource, resourceId = null, details = {}, suc
 
     const seq = prevSeq + 1;
     const ts = new Date().toISOString();
-    const userId = req.user ? req.user.user_id : null;
-    const role = req.user ? req.user.role : 'anonymous';
-    const ip = req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown';
+    const userId = req && req.user ? req.user.user_id : null;
+    const role = req && req.user ? req.user.role : 'anonymous';
+    const ip = extractIp(req);
 
     const dataObj = {
       seq,

@@ -1,0 +1,118 @@
+table_name,pos,column_name,data_type,nullable,default_value,keys,table_description
+app_user,1,user_id,integer,NO,identity,PK,Login accounts for all roles; password stored only as a bcrypt hash.
+app_user,2,email,text,NO,,UNIQUE,Login accounts for all roles; password stored only as a bcrypt hash.
+app_user,3,password_hash,text,NO,,,Login accounts for all roles; password stored only as a bcrypt hash.
+app_user,4,full_name,text,NO,,,Login accounts for all roles; password stored only as a bcrypt hash.
+app_user,5,role_name,text,NO,,FK -> role_def,Login accounts for all roles; password stored only as a bcrypt hash.
+app_user,6,branch_id,integer,YES,,FK -> branch,Login accounts for all roles; password stored only as a bcrypt hash.
+app_user,7,hospital_id,integer,YES,,FK -> hospital,Login accounts for all roles; password stored only as a bcrypt hash.
+app_user,8,is_active,boolean,NO,true,,Login accounts for all roles; password stored only as a bcrypt hash.
+app_user,9,failed_attempts,smallint,NO,0,,Login accounts for all roles; password stored only as a bcrypt hash.
+app_user,10,locked_until,timestamp with time zone,YES,,,Login accounts for all roles; password stored only as a bcrypt hash.
+app_user,11,created_at,timestamp with time zone,NO,now(),,Login accounts for all roles; password stored only as a bcrypt hash.
+blood_request,1,request_id,integer,NO,identity,PK,Hospital request for blood; patient identified by a pseudonymous patient_ref only.
+blood_request,2,hospital_id,integer,NO,,FK -> hospital,Hospital request for blood; patient identified by a pseudonymous patient_ref only.
+blood_request,3,requested_by,integer,NO,,FK -> app_user,Hospital request for blood; patient identified by a pseudonymous patient_ref only.
+blood_request,4,patient_ref,text,NO,,,Hospital request for blood; patient identified by a pseudonymous patient_ref only.
+blood_request,5,blood_group,blood_group_t,NO,,,Hospital request for blood; patient identified by a pseudonymous patient_ref only.
+blood_request,6,component,component_t,NO,,FK -> component_spec,Hospital request for blood; patient identified by a pseudonymous patient_ref only.
+blood_request,7,units_needed,smallint,NO,,,Hospital request for blood; patient identified by a pseudonymous patient_ref only.
+blood_request,8,urgency,urgency_t,NO,'ROUTINE'::urgency_t,,Hospital request for blood; patient identified by a pseudonymous patient_ref only.
+blood_request,9,status,request_status_t,NO,'PENDING'::request_status_t,,Hospital request for blood; patient identified by a pseudonymous patient_ref only.
+blood_request,10,needed_by,timestamp with time zone,YES,,,Hospital request for blood; patient identified by a pseudonymous patient_ref only.
+blood_request,11,classification,smallint,NO,1,,Hospital request for blood; patient identified by a pseudonymous patient_ref only.
+blood_request,12,created_at,timestamp with time zone,NO,now(),,Hospital request for blood; patient identified by a pseudonymous patient_ref only.
+blood_request,13,updated_at,timestamp with time zone,NO,now(),,Hospital request for blood; patient identified by a pseudonymous patient_ref only.
+blood_unit,1,unit_id,integer,NO,identity,PK,A storable bag of one component from a donation; carries status and expiry.
+blood_unit,2,unit_code,text,NO,,UNIQUE,A storable bag of one component from a donation; carries status and expiry.
+blood_unit,3,donation_id,integer,NO,,"FK -> donation, UNIQUE",A storable bag of one component from a donation; carries status and expiry.
+blood_unit,4,component,component_t,NO,,"FK -> component_spec, UNIQUE",A storable bag of one component from a donation; carries status and expiry.
+blood_unit,5,volume_ml,integer,NO,,,A storable bag of one component from a donation; carries status and expiry.
+blood_unit,6,status,unit_status_t,NO,'QUARANTINE'::unit_status_t,,A storable bag of one component from a donation; carries status and expiry.
+blood_unit,7,storage_location,text,YES,,,A storable bag of one component from a donation; carries status and expiry.
+blood_unit,8,expires_on,date,NO,,,A storable bag of one component from a donation; carries status and expiry.
+blood_unit,9,classification,smallint,NO,1,,A storable bag of one component from a donation; carries status and expiry.
+blood_unit,10,created_at,timestamp with time zone,NO,now(),,A storable bag of one component from a donation; carries status and expiry.
+branch,1,branch_id,integer,NO,identity,PK,Blood bank branches; parent_branch_id models hub and local-centre hierarchy.
+branch,2,branch_name,text,NO,,UNIQUE,Blood bank branches; parent_branch_id models hub and local-centre hierarchy.
+branch,3,region_code,character(3),NO,,FK -> region,Blood bank branches; parent_branch_id models hub and local-centre hierarchy.
+branch,4,parent_branch_id,integer,YES,,FK -> branch,Blood bank branches; parent_branch_id models hub and local-centre hierarchy.
+branch,5,address,address_t,YES,,,Blood bank branches; parent_branch_id models hub and local-centre hierarchy.
+branch,6,latitude,"numeric(9,6)",YES,,,Blood bank branches; parent_branch_id models hub and local-centre hierarchy.
+branch,7,longitude,"numeric(9,6)",YES,,,Blood bank branches; parent_branch_id models hub and local-centre hierarchy.
+branch,8,created_at,timestamp with time zone,NO,now(),,Blood bank branches; parent_branch_id models hub and local-centre hierarchy.
+component_spec,1,component,component_t,NO,,PK,"Shelf life per blood component, used to compute unit expiry."
+component_spec,2,shelf_life_days,integer,NO,,,"Shelf life per blood component, used to compute unit expiry."
+component_spec,3,storage_note,text,YES,,,"Shelf life per blood component, used to compute unit expiry."
+donation,1,donation_id,integer,NO,identity,PK,"One blood donation event: donor, branch, volume and haemoglobin (classification 2)."
+donation,2,donor_id,integer,NO,,FK -> donor,"One blood donation event: donor, branch, volume and haemoglobin (classification 2)."
+donation,3,branch_id,integer,NO,,FK -> branch,"One blood donation event: donor, branch, volume and haemoglobin (classification 2)."
+donation,4,donated_at,timestamp with time zone,NO,,,"One blood donation event: donor, branch, volume and haemoglobin (classification 2)."
+donation,5,volume_ml,integer,NO,,,"One blood donation event: donor, branch, volume and haemoglobin (classification 2)."
+donation,6,hemoglobin_gdl,"numeric(4,1)",NO,,,"One blood donation event: donor, branch, volume and haemoglobin (classification 2)."
+donation,7,collected_by,integer,NO,,FK -> app_user,"One blood donation event: donor, branch, volume and haemoglobin (classification 2)."
+donation,8,classification,smallint,NO,2,,"One blood donation event: donor, branch, volume and haemoglobin (classification 2)."
+donation,9,created_at,timestamp with time zone,NO,now(),,"One blood donation event: donor, branch, volume and haemoglobin (classification 2)."
+donor,1,donor_id,integer,NO,identity,PK,"Donor medical and location profile (confidential, classification 2)."
+donor,2,user_id,integer,NO,,"FK -> app_user, UNIQUE","Donor medical and location profile (confidential, classification 2)."
+donor,3,date_of_birth,date,NO,,,"Donor medical and location profile (confidential, classification 2)."
+donor,4,gender,character(1),NO,,,"Donor medical and location profile (confidential, classification 2)."
+donor,5,blood_group,blood_group_t,NO,,,"Donor medical and location profile (confidential, classification 2)."
+donor,6,weight_kg,"numeric(5,1)",NO,,,"Donor medical and location profile (confidential, classification 2)."
+donor,7,region_code,character(3),NO,,FK -> region,"Donor medical and location profile (confidential, classification 2)."
+donor,8,latitude,"numeric(9,6)",YES,,,"Donor medical and location profile (confidential, classification 2)."
+donor,9,longitude,"numeric(9,6)",YES,,,"Donor medical and location profile (confidential, classification 2)."
+donor,10,is_available,boolean,NO,true,,"Donor medical and location profile (confidential, classification 2)."
+donor,11,classification,smallint,NO,2,,"Donor medical and location profile (confidential, classification 2)."
+donor,12,created_at,timestamp with time zone,NO,now(),,"Donor medical and location profile (confidential, classification 2)."
+donor_alert,1,alert_id,integer,NO,identity,PK,Emergency alert sent to a nearby compatible donor and the donor's response.
+donor_alert,2,request_id,integer,NO,,"FK -> blood_request, UNIQUE",Emergency alert sent to a nearby compatible donor and the donor's response.
+donor_alert,3,donor_id,integer,NO,,"FK -> donor, UNIQUE",Emergency alert sent to a nearby compatible donor and the donor's response.
+donor_alert,4,distance_km,"numeric(6,2)",YES,,,Emergency alert sent to a nearby compatible donor and the donor's response.
+donor_alert,5,sent_at,timestamp with time zone,NO,now(),,Emergency alert sent to a nearby compatible donor and the donor's response.
+donor_alert,6,response,alert_response_t,NO,'PENDING'::alert_response_t,,Emergency alert sent to a nearby compatible donor and the donor's response.
+donor_alert,7,responded_at,timestamp with time zone,YES,,,Emergency alert sent to a nearby compatible donor and the donor's response.
+donor_alert,8,classification,smallint,NO,2,,Emergency alert sent to a nearby compatible donor and the donor's response.
+donor_contact,1,donor_id,integer,NO,,"FK -> donor, PK","Donor phone, email and address, encrypted with pgcrypto (classification 2)."
+donor_contact,2,phone_enc,bytea,NO,,,"Donor phone, email and address, encrypted with pgcrypto (classification 2)."
+donor_contact,3,email_enc,bytea,YES,,,"Donor phone, email and address, encrypted with pgcrypto (classification 2)."
+donor_contact,4,address_enc,bytea,YES,,,"Donor phone, email and address, encrypted with pgcrypto (classification 2)."
+donor_contact,5,key_version,smallint,NO,1,,"Donor phone, email and address, encrypted with pgcrypto (classification 2)."
+donor_contact,6,classification,smallint,NO,2,,"Donor phone, email and address, encrypted with pgcrypto (classification 2)."
+donor_contact,7,updated_at,timestamp with time zone,NO,now(),,"Donor phone, email and address, encrypted with pgcrypto (classification 2)."
+hospital,1,hospital_id,integer,NO,identity,PK,Hospitals that place blood requests.
+hospital,2,hospital_name,text,NO,,UNIQUE,Hospitals that place blood requests.
+hospital,3,region_code,character(3),NO,,"FK -> region, UNIQUE",Hospitals that place blood requests.
+hospital,4,address,address_t,YES,,,Hospitals that place blood requests.
+hospital,5,phone,phone_t,YES,,,Hospitals that place blood requests.
+hospital,6,latitude,"numeric(9,6)",YES,,,Hospitals that place blood requests.
+hospital,7,longitude,"numeric(9,6)",YES,,,Hospitals that place blood requests.
+hospital,8,is_verified,boolean,NO,false,,Hospitals that place blood requests.
+hospital,9,created_at,timestamp with time zone,NO,now(),,Hospitals that place blood requests.
+region,1,region_code,character(3),NO,,PK,Geographic regions; also the partition key for stock_movement.
+region,2,region_name,text,NO,,UNIQUE,Geographic regions; also the partition key for stock_movement.
+request_allocation,1,allocation_id,integer,NO,identity,PK,Links a request to the unit issued for it; unit_id is UNIQUE so a unit cannot be double-allocated.
+request_allocation,2,request_id,integer,NO,,FK -> blood_request,Links a request to the unit issued for it; unit_id is UNIQUE so a unit cannot be double-allocated.
+request_allocation,3,unit_id,integer,NO,,"FK -> blood_unit, UNIQUE",Links a request to the unit issued for it; unit_id is UNIQUE so a unit cannot be double-allocated.
+request_allocation,4,allocated_by,integer,NO,,FK -> app_user,Links a request to the unit issued for it; unit_id is UNIQUE so a unit cannot be double-allocated.
+request_allocation,5,allocated_at,timestamp with time zone,NO,now(),,Links a request to the unit issued for it; unit_id is UNIQUE so a unit cannot be double-allocated.
+request_allocation,6,classification,smallint,NO,1,,Links a request to the unit issued for it; unit_id is UNIQUE so a unit cannot be double-allocated.
+role_def,1,role_name,text,NO,,PK,Application roles with their DB role and MAC clearance (single source of truth).
+role_def,2,db_role,name,NO,,UNIQUE,Application roles with their DB role and MAC clearance (single source of truth).
+role_def,3,clearance,smallint,NO,,,Application roles with their DB role and MAC clearance (single source of truth).
+role_def,4,description,text,YES,,,Application roles with their DB role and MAC clearance (single source of truth).
+screening_result,1,screening_id,integer,NO,identity,PK,Infectious-disease test results per donation; RESTRICTED (classification 3).
+screening_result,2,donation_id,integer,NO,,"FK -> donation, UNIQUE",Infectious-disease test results per donation; RESTRICTED (classification 3).
+screening_result,3,test_type,test_type_t,NO,,UNIQUE,Infectious-disease test results per donation; RESTRICTED (classification 3).
+screening_result,4,result,test_result_t,NO,,,Infectious-disease test results per donation; RESTRICTED (classification 3).
+screening_result,5,report,jsonb,NO,'{}'::jsonb,,Infectious-disease test results per donation; RESTRICTED (classification 3).
+screening_result,6,tested_by,integer,NO,,FK -> app_user,Infectious-disease test results per donation; RESTRICTED (classification 3).
+screening_result,7,tested_at,timestamp with time zone,NO,now(),,Infectious-disease test results per donation; RESTRICTED (classification 3).
+screening_result,8,classification,smallint,NO,3,,Infectious-disease test results per donation; RESTRICTED (classification 3).
+stock_movement,1,movement_id,bigint,NO,nextval('stock_movement_seq'::regclass),PK,"Append-only ledger of unit status changes, list-partitioned by region_code."
+stock_movement,2,unit_id,integer,NO,,FK -> blood_unit,"Append-only ledger of unit status changes, list-partitioned by region_code."
+stock_movement,3,region_code,character(3),NO,,"FK -> region, PK","Append-only ledger of unit status changes, list-partitioned by region_code."
+stock_movement,4,movement_type,movement_type_t,NO,,,"Append-only ledger of unit status changes, list-partitioned by region_code."
+stock_movement,5,performed_by,integer,YES,,FK -> app_user,"Append-only ledger of unit status changes, list-partitioned by region_code."
+stock_movement,6,moved_at,timestamp with time zone,NO,now(),,"Append-only ledger of unit status changes, list-partitioned by region_code."
+stock_movement,7,note,text,YES,,,"Append-only ledger of unit status changes, list-partitioned by region_code."

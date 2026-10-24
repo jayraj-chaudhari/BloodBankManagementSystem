@@ -1,0 +1,40 @@
+3NF normalization proof (paste into the report)
+Method
+
+All 15 tables were checked against the three normal forms:
+
+1NF: every column holds a single value, with no repeating groups. address_t is a composite type that is always read and written as one unit, and none of its parts determines any other column. The JSONB report is likewise stored and used as one document.
+2NF: no non-key column depends on only part of a candidate key.
+3NF: for every non-trivial dependency X → A, X is a superkey or A is a prime attribute (part of a candidate key). In practice this means no non-key column depends on another non-key column.
+Functional dependencies per table
+Table	Candidate keys	Non-trivial dependencies	Result
+region	region_code; region_name	region_code → region_name	3NF (BCNF)
+role_def	role_name; db_role	role_name → db_role, clearance, description	3NF (BCNF)
+component_spec	component	component → shelf_life_days, storage_note	3NF (BCNF)
+branch	branch_id; branch_name	branch_id → all columns	3NF (BCNF)
+hospital	hospital_id; (hospital_name, region_code)	hospital_id → all columns	3NF (BCNF)
+app_user	user_id; email	user_id → all columns	3NF (BCNF)
+donor	donor_id; user_id	donor_id → all columns	3NF (BCNF)
+donor_contact	donor_id	donor_id → all columns	3NF (BCNF)
+donation	donation_id	donation_id → all columns	3NF (BCNF)
+blood_unit	unit_id; unit_code; (donation_id, component)	unit_id → all; (donation_id, component) → expires_on	3NF
+screening_result	screening_id; (donation_id, test_type)	screening_id → all	3NF (BCNF)
+blood_request	request_id	request_id → all columns	3NF (BCNF)
+request_allocation	allocation_id; unit_id	allocation_id → all columns	3NF (BCNF)
+donor_alert	alert_id; (request_id, donor_id)	alert_id → all columns	3NF (BCNF)
+stock_movement	movement_id (logical key)	movement_id → all columns	3NF, see note 2
+Design decisions that avoided violations
+clearance is stored only in role_def. Keeping it in app_user would create a transitive dependency user_id → role_name → clearance.
+A donor’s name lives only in app_user, not repeated in donor.
+The blood group of a unit is not stored in blood_unit. It would be the chain unit_id → donation_id → donor_id → blood_group, so it is reached through joins and the views v_inventory and v_public_inventory.
+Shelf life is in component_spec, not repeated per unit.
+Hospital and branch addresses are not copied into requests or donations, which only reference them by id.
+last donation date and eligibility are computed (view v_donor_eligibility), not stored on donor, so they can never become stale.
+Roles, regions and components are enforced by foreign keys to lookup tables or enum types.
+Deliberate, documented exceptions
+blood_unit.expires_on is a derived value (donation date + shelf life). It is stored for fast FEFO ordering and filled only by trigger trg_unit_set_expiry, so it cannot be set wrongly. It does not break 3NF, because its determinant (donation_id, component) is itself a candidate key.
+stock_movement.region_code is redundant (it equals the unit’s branch region). PostgreSQL requires the partition key to be a column of the table, so it is stored on purpose to enable regional partitioning. The primary key is physically (movement_id, region_code) for the same reason, while the logical candidate key is movement_id alone, so no partial dependency exists. This is a conscious trade-off of a little redundancy for fragmentation by region.
+classification columns are constant per table and exist to support the MAC policies, not business facts.
+Conclusion
+
+All 15 relations satisfy 1NF, 2NF and 3NF (13 also satisfy BCNF). The two intentional redundancies above are justified by performance and by the partitioning requirement, and both are written only by the database itself.

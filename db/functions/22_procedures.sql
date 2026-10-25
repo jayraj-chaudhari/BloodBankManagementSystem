@@ -107,7 +107,7 @@ DECLARE
     v_user_id  int;
     v_donor_id int;
 BEGIN
-    IF v_email IS NULL OR v_email !~ '^[^@\s]+@[^@\s]+\.[^@\s]+$' THEN
+    IF v_email IS NULL OR v_email !~ '^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$' THEN
         RAISE EXCEPTION 'VALIDATION_ERROR: invalid email';
     END IF;
     IF p_password_hash IS NULL OR p_password_hash !~ '^\$2[aby]\$[0-9]{2}\$.{53}$' THEN

@@ -5,7 +5,7 @@ const { withContext } = require('../middleware/withContext');
 const validate = require('../middleware/validate');
 const { createRequestSchema, updateRequestStatusSchema } = require('../validators/schemas');
 const { audit } = require('../services/auditService');
-const { emitRequestCreated, emitInventoryUpdate } = require('../services/socketService');
+const { emitRequestCreated, emitRequestUpdated, emitInventoryUpdate } = require('../services/socketService');
 
 // POST /api/v1/requests (hospital_user, bb_officer, admin)
 router.post('/', authenticate, authorizeRoles('hospital_user', 'bb_officer', 'admin'), validate(createRequestSchema), async (req, res, next) => {
@@ -213,8 +213,14 @@ router.post('/:request_id/allocate', authenticate, authorizeRoles('bb_officer', 
       allocated_count: allocatedCount
     });
 
-    // Real-time inventory broadcast
+    // Real-time inventory & request status broadcast
     emitInventoryUpdate({
+      action: 'FEFO_ALLOCATION',
+      request_id: requestId,
+      allocated_units: Number(allocatedCount)
+    });
+
+    emitRequestUpdated({
       action: 'FEFO_ALLOCATION',
       request_id: requestId,
       allocated_units: Number(allocatedCount)
@@ -256,7 +262,7 @@ router.patch('/:request_id/status', authenticate, validate(updateRequestStatusSc
     const row = await withContext(req.user, async (client) => {
       let q = `
         UPDATE blood_request
-           SET status = $1, updated_at = now()
+           SET status = $1
          WHERE request_id = $2
       `;
       const params = [status, requestId];
@@ -280,6 +286,14 @@ router.patch('/:request_id/status', authenticate, validate(updateRequestStatusSc
         }
       });
     }
+
+    emitRequestUpdated({
+      action: 'STATUS_UPDATED',
+      request_id: row.request_id,
+      hospital_id: row.hospital_id,
+      status: row.status,
+      patient_ref: row.patient_ref
+    });
 
     return res.status(200).json({ data: row });
   } catch (err) {

@@ -78,8 +78,20 @@ function emitInventoryUpdate(updatePayload) {
  */
 function emitRequestCreated(requestPayload) {
   if (!ioInstance) return;
-  ioInstance.to('role_bb_officer').to('role_admin').emit('new_blood_request', {
+  ioInstance.emit('new_blood_request', {
     ...requestPayload,
+    emitted_at: new Date().toISOString()
+  });
+}
+
+/**
+ * Broadcasts request status updates (PENDING -> PARTIAL -> FULFILLED, CANCELLED)
+ * @param {Object} updatePayload 
+ */
+function emitRequestUpdated(updatePayload) {
+  if (!ioInstance) return;
+  ioInstance.emit('request_update', {
+    ...updatePayload,
     emitted_at: new Date().toISOString()
   });
 }
@@ -90,5 +102,6 @@ module.exports = {
   emitEmergencyAlert,
   emitAlertResponse,
   emitInventoryUpdate,
-  emitRequestCreated
+  emitRequestCreated,
+  emitRequestUpdated
 };

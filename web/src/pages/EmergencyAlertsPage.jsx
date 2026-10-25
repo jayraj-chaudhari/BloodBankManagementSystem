@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { Radio, Send, CheckCircle2, XCircle, MapPin, AlertTriangle, Users } from 'lucide-react';
 import { alertApi, requestApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import Modal from '../components/common/Modal';
 
 export default function EmergencyAlertsPage() {
   const { user } = useAuth();
+  const toast = useToast();
   const role = user?.role || user?.role_name;
   const isDonor = role === 'donor';
 
@@ -25,7 +27,11 @@ export default function EmergencyAlertsPage() {
         setDonorAlerts(res.data || []);
       } else {
         const reqRes = await requestApi.getRequests({ urgency: 'EMERGENCY' });
-        setRequests(reqRes.data || []);
+        const list = reqRes.data || [];
+        setRequests(list);
+        if (list.length > 0 && !selectedReqId) {
+          setSelectedReqId(String(list[0].request_id));
+        }
       }
     } catch (err) {
       console.error('Failed to load alert data:', err);
@@ -40,26 +46,39 @@ export default function EmergencyAlertsPage() {
 
   const handleDispatch = async (e) => {
     e.preventDefault();
-    if (!selectedReqId) return;
+    if (!selectedReqId) {
+      toast.warning('Please select an active emergency requisition to broadcast.');
+      return;
+    }
 
     try {
       const res = await alertApi.createAlerts(selectedReqId, Number(radiusKm), Number(maxDonors));
-      setMessage({
-        type: 'success',
-        text: `Emergency alert dispatched to ${res.data.length} compatible nearby donor(s) via WebSocket & Haversine distance!`
-      });
+      const dispatchedCount = res.data?.length || 0;
+      if (dispatchedCount > 0) {
+        const msg = `Dispatched emergency alert to ${dispatchedCount} compatible nearby donor(s) via Haversine distance!`;
+        toast.success(msg, 'Alerts Dispatched');
+        setMessage({ type: 'success', text: msg });
+      } else {
+        const msg = 'No compatible available donors found within the specified radius. Try expanding the search radius.';
+        toast.info(msg, 'Zero Donors in Radius');
+        setMessage({ type: 'warning', text: msg });
+      }
       loadData();
     } catch (err) {
-      setMessage({ type: 'error', text: err.message || 'Dispatch failed' });
+      const errMsg = err.message || 'Dispatch failed';
+      toast.error(errMsg, 'Dispatch Error');
+      setMessage({ type: 'error', text: errMsg });
     }
   };
 
   const handleRespond = async (alertId, response) => {
     try {
       await alertApi.respondAlert(alertId, response);
+      toast.success(`You have ${response} the emergency blood request!`, 'Response Recorded');
       setMessage({ type: 'success', text: `You have ${response} the emergency blood request!` });
       loadData();
     } catch (err) {
+      toast.error(err.message || 'Failed to submit response');
       setMessage({ type: 'error', text: err.message || 'Failed to submit response' });
     }
   };

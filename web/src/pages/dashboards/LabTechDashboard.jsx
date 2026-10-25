@@ -8,7 +8,8 @@ import {
   Plus,
   ShieldCheck,
   TrendingUp,
-  FileText
+  FileText,
+  Layers
 } from 'lucide-react';
 import HeroBanner from '../../components/common/HeroBanner';
 import StatCard from '../../components/common/StatCard';
@@ -16,14 +17,17 @@ import Modal from '../../components/common/Modal';
 import { screeningApi, unitApi, inventoryApi } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
+import { useSocket } from '../../context/SocketContext';
 
 export default function LabTechDashboard() {
   const { user } = useAuth();
   const toast = useToast();
+  const { isConnected, lastInventoryEvent } = useSocket();
 
   const [loading, setLoading] = useState(true);
   const [screenings, setScreenings] = useState([]);
   const [quarantineUnits, setQuarantineUnits] = useState([]);
+  const [pendingDonations, setPendingDonations] = useState([]);
   const [showTestModal, setShowTestModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
@@ -38,13 +42,15 @@ export default function LabTechDashboard() {
   const loadLabData = async () => {
     try {
       setLoading(true);
-      // 1. Fetch recent screening records (Classification 3 RESTRICTED - Lab Tech only)
-      const scrRes = await screeningApi.getScreenings({ limit: 15 });
-      setScreenings(scrRes.data || []);
+      const [scrRes, unitRes, pendRes] = await Promise.all([
+        screeningApi.getScreenings(),
+        unitApi.getUnits({ status: 'QUARANTINE', limit: 25 }),
+        screeningApi.getPendingScreenings()
+      ]);
 
-      // 2. Fetch quarantine units waiting for testing
-      const unitRes = await unitApi.getUnits({ status: 'QUARANTINE', limit: 15 });
+      setScreenings(scrRes.data || []);
       setQuarantineUnits(unitRes.data || []);
+      setPendingDonations(pendRes.data || []);
     } catch (err) {
       toast.error(err.message || 'Failed to load laboratory queue');
     } finally {
@@ -54,7 +60,7 @@ export default function LabTechDashboard() {
 
   useEffect(() => {
     loadLabData();
-  }, []);
+  }, [lastInventoryEvent]);
 
   const handleRecordTest = async (e) => {
     e.preventDefault();
@@ -74,6 +80,29 @@ export default function LabTechDashboard() {
       loadLabData();
     } catch (err) {
       toast.error(err.message || 'Failed to record test');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleQuickPassAll = async (donationId, pendingTests) => {
+    try {
+      setSubmitting(true);
+      for (const t of pendingTests) {
+        await screeningApi.createScreening({
+          donation_id: donationId,
+          test_type: t,
+          result: 'NEGATIVE',
+          report: { method: 'EIA_ELISA', note: 'Standard viral safety panel clear' }
+        });
+      }
+      toast.success(
+        `All ${pendingTests.length} tests recorded NEGATIVE for Donation #${donationId}. Units released to AVAILABLE!`,
+        'Specimen Cleared'
+      );
+      loadLabData();
+    } catch (err) {
+      toast.error(err.message || 'Quick testing failed');
     } finally {
       setSubmitting(false);
     }
@@ -107,10 +136,17 @@ export default function LabTechDashboard() {
       }}>
         <StatCard
           icon={Clock}
-          label="Quarantine Queue"
-          value={quarantineUnits.length}
-          badgeText="Units In Processing"
+          label="Pending Batches"
+          value={pendingDonations.length}
+          badgeText="Awaiting Testing"
           color="#f59e0b"
+        />
+        <StatCard
+          icon={Layers}
+          label="Quarantined Units"
+          value={quarantineUnits.length}
+          badgeText="Bags Locked"
+          color="#d97706"
         />
         <StatCard
           icon={CheckCircle2}
@@ -126,13 +162,159 @@ export default function LabTechDashboard() {
           badgeText="Auto-Discarded"
           color="#ef4444"
         />
-        <StatCard
-          icon={Microscope}
-          label="Total Screened"
-          value={screenings.length}
-          badgeText="Audit Tracked"
-          color="#3a57e8"
-        />
+      </div>
+
+      {/* DEDICATED LAB TECHNICIAN WORKLIST: Pending Blood Lab Screening Queue */}
+      <div style={{
+        backgroundColor: '#ffffff',
+        borderRadius: 'var(--radius-lg)',
+        padding: '24px',
+        boxShadow: 'var(--shadow-card)',
+        border: '1px solid var(--border-light)'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '18px' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Microscope size={20} color="var(--primary)" />
+              <h3 style={{ fontSize: '18px', fontWeight: '800', color: 'var(--text-main)', margin: 0 }}>
+                Pending Blood Lab Screening Queue
+              </h3>
+              <span style={{ fontSize: '11px', fontWeight: '800', padding: '2px 8px', borderRadius: '12px', backgroundColor: '#fef3c7', color: '#b45309' }}>
+                {pendingDonations.length} Batch(es) Pending
+              </span>
+            </div>
+            <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
+              Only certified laboratory specialists have access to this queue. Passing all 5 tests releases component units to AVAILABLE.
+            </p>
+          </div>
+        </div>
+
+        {pendingDonations.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '36px', color: 'var(--text-muted)', backgroundColor: '#f8fafc', borderRadius: '8px' }}>
+            <CheckCircle2 size={32} color="var(--success)" style={{ margin: '0 auto 10px', display: 'block' }} />
+            <div style={{ fontWeight: '700', fontSize: '14px', color: 'var(--text-main)' }}>All Screening Tests Complete</div>
+            <div style={{ fontSize: '12px' }}>Zero donations currently awaiting viral screening.</div>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            {pendingDonations.map((don) => (
+              <div
+                key={don.donation_id}
+                style={{
+                  padding: '16px 20px',
+                  borderRadius: '10px',
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #e2e8f0',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.03)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: '16px'
+                }}
+              >
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ fontSize: '15px', fontWeight: '800', color: 'var(--primary)' }}>
+                      Donation #{don.donation_id}
+                    </span>
+                    <span style={{ fontWeight: '800', fontSize: '12px', padding: '2px 8px', borderRadius: '4px', backgroundColor: '#f0f3fe', color: 'var(--primary)' }}>
+                      {don.blood_group}
+                    </span>
+                    <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-main)' }}>
+                      {don.donor_name}
+                    </span>
+                    <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                      • {don.volume_ml} mL • {don.branch_name}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '8px', marginTop: '10px', flexWrap: 'wrap' }}>
+                    {['HIV', 'HBV', 'HCV', 'SYPHILIS', 'MALARIA'].map((testName) => {
+                      const completed = (don.completed_tests || []).find(t => t.test_type === testName);
+                      const isNeg = completed?.result === 'NEGATIVE';
+                      const isPos = completed?.result === 'POSITIVE';
+
+                      return (
+                        <span
+                          key={testName}
+                          style={{
+                            fontSize: '11px',
+                            fontWeight: '700',
+                            padding: '4px 10px',
+                            borderRadius: '6px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            backgroundColor: isNeg ? '#dcfce7' : isPos ? '#fee2e2' : '#fef3c7',
+                            color: isNeg ? '#15803d' : isPos ? '#b91c1c' : '#b45309',
+                            border: `1px solid ${isNeg ? '#bbf7d0' : isPos ? '#fecaca' : '#fde68a'}`
+                          }}
+                        >
+                          {isNeg && <CheckCircle2 size={12} />}
+                          {isPos && <XCircle size={12} />}
+                          {!completed && <Clock size={12} />}
+                          {testName}: {completed ? completed.result : 'PENDING'}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    onClick={() => {
+                      setTestForm({
+                        donation_id: don.donation_id,
+                        test_type: don.pending_tests[0] || 'HIV',
+                        result: 'NEGATIVE',
+                        report: { notes: 'Automated screening panel analysis' }
+                      });
+                      setShowTestModal(true);
+                    }}
+                    style={{
+                      padding: '8px 14px',
+                      borderRadius: '6px',
+                      backgroundColor: 'var(--primary)',
+                      color: '#ffffff',
+                      border: 'none',
+                      fontSize: '12px',
+                      fontWeight: '700',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    }}
+                  >
+                    <Microscope size={14} /> Run Test ({don.pending_tests[0] || 'Next'})
+                  </button>
+
+                  {don.pending_tests.length > 0 && (
+                    <button
+                      onClick={() => handleQuickPassAll(don.donation_id, don.pending_tests)}
+                      disabled={submitting}
+                      style={{
+                        padding: '8px 14px',
+                        borderRadius: '6px',
+                        backgroundColor: '#10b981',
+                        color: '#ffffff',
+                        border: 'none',
+                        fontSize: '12px',
+                        fontWeight: '700',
+                        cursor: submitting ? 'not-allowed' : 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      <CheckCircle2 size={14} /> Pass Remaining Negative ({don.pending_tests.length})
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Main Grid: Screenings Log & Quarantine Queue */}
@@ -179,7 +361,7 @@ export default function LabTechDashboard() {
               No laboratory results recorded yet.
             </div>
           ) : (
-            <div style={{ overflowX: 'auto' }}>
+            <div style={{ overflowX: 'auto', maxHeight: '400px' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
                 <thead>
                   <tr style={{ borderBottom: '2px solid #f1f5f9', color: 'var(--text-muted)' }}>
@@ -239,14 +421,14 @@ export default function LabTechDashboard() {
         }}>
           <div>
             <div style={{ fontSize: '16px', fontWeight: '800', color: 'var(--text-main)' }}>
-              Units Awaiting 5-Marker Screen
+              Quarantine Bag Inventory
             </div>
             <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-              Requires HIV, HBV, HCV, SYPHILIS, MALARIA negative results to release
+              Physical component units locked pending viral clearance
             </div>
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '450px', overflowY: 'auto' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '400px', overflowY: 'auto' }}>
             {quarantineUnits.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)', fontSize: '12px' }}>
                 All collected blood units have been tested or processed.

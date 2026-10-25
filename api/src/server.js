@@ -21,34 +21,64 @@ const io = new Server(server, {
 initSocket(io);
 
 io.on('connection', (socket) => {
-  // Allow client to authenticate via token to auto-join appropriate rooms
-  socket.on('authenticate', (token) => {
+  // Check auth from handshake or query
+  const token = socket.handshake.auth?.token || socket.handshake.query?.token;
+  if (token) {
     try {
-      if (token) {
-        const decoded = jwt.verify(token, config.JWT_SECRET);
+      const decoded = jwt.verify(token, config.JWT_SECRET);
+      socket.user = decoded;
+      if (decoded.role) {
+        socket.join(`role_${decoded.role}`);
+        socket.join(`role:${decoded.role}`);
+      }
+      if (decoded.donor_id) {
+        socket.join(`donor_${decoded.donor_id}`);
+        socket.join(`donor:${decoded.donor_id}`);
+      }
+      if (decoded.hospital_id) {
+        socket.join(`hospital_${decoded.hospital_id}`);
+        socket.join(`hospital:${decoded.hospital_id}`);
+      }
+    } catch (e) {}
+  }
+
+  // Allow client to authenticate via token to auto-join appropriate rooms
+  socket.on('authenticate', (tok) => {
+    try {
+      const targetToken = tok || token;
+      if (targetToken) {
+        const decoded = jwt.verify(targetToken, config.JWT_SECRET);
         socket.user = decoded;
 
-        // Auto-join role room (e.g. role_bb_officer, role_donor, role_admin)
         if (decoded.role) {
           socket.join(`role_${decoded.role}`);
+          socket.join(`role:${decoded.role}`);
         }
-        // Auto-join donor room
         if (decoded.donor_id) {
           socket.join(`donor_${decoded.donor_id}`);
+          socket.join(`donor:${decoded.donor_id}`);
         }
-        // Auto-join branch room
         if (decoded.branch_id) {
           socket.join(`branch_${decoded.branch_id}`);
+          socket.join(`branch:${decoded.branch_id}`);
         }
-        // Auto-join hospital room
         if (decoded.hospital_id) {
           socket.join(`hospital_${decoded.hospital_id}`);
+          socket.join(`hospital:${decoded.hospital_id}`);
         }
 
         socket.emit('authenticated', { user_id: decoded.user_id, role: decoded.role });
       }
     } catch (e) {
       socket.emit('auth_error', { message: 'Authentication failed' });
+    }
+  });
+
+  // Generic join handler for flexible rooms
+  socket.on('join', (room) => {
+    if (typeof room === 'string') {
+      socket.join(room);
+      socket.join(room.replace(':', '_'));
     }
   });
 

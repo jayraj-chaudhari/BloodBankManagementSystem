@@ -21,7 +21,7 @@ import { useSocket } from '../../context/SocketContext';
 export default function HospitalDashboard() {
   const { user } = useAuth();
   const toast = useToast();
-  const { isConnected } = useSocket();
+  const { isConnected, lastRequestEvent, lastInventoryEvent } = useSocket();
 
   const [loading, setLoading] = useState(true);
   const [requests, setRequests] = useState([]);
@@ -58,7 +58,7 @@ export default function HospitalDashboard() {
 
   useEffect(() => {
     loadHospitalData();
-  }, []);
+  }, [lastRequestEvent, lastInventoryEvent]);
 
   const handleCreateOrder = async (e) => {
     e.preventDefault();

@@ -74,7 +74,13 @@ export const donationApi = {
 
 // 5. Screening & Lab APIs
 export const screeningApi = {
-  getScreenings: (donationId) => api.get(`/screenings?donation_id=${donationId}`),
+  getScreenings: (params) => {
+    if (typeof params === 'object' && params !== null) {
+      return api.get('/screenings', { params });
+    }
+    return params ? api.get(`/screenings?donation_id=${params}`) : api.get('/screenings');
+  },
+  getPendingScreenings: () => api.get('/screenings/pending'),
   createScreening: (data) => api.post('/screenings', data)
 };
 

@@ -73,6 +73,10 @@ router.get('/', authenticate, authorizeRoles('bb_officer', 'admin', 'lab_tech'),
       let eligibilitySelect = `, v.last_donated_at, v.next_eligible_on, v.is_eligible`;
       let extraWhere = '';
 
+      // Column-level DAC: only admin has SELECT on app_user.email; staff roles see concealed placeholder
+      // Contact PII (email, phone, address) can be revealed via /api/v1/donors/:donor_id/contact
+      const emailField = req.user.role === 'admin' ? 'u.email' : `'[CONCEALED BY DAC]' AS email`;
+
       if (eligible === 'true') {
         extraWhere = ' AND (v.is_eligible = true OR v.is_eligible IS NULL)';
       }
@@ -87,7 +91,7 @@ router.get('/', authenticate, authorizeRoles('bb_officer', 'admin', 'lab_tech'),
         const dataRes = await client.query(`
           SELECT d.donor_id, d.user_id, d.date_of_birth, d.gender, d.blood_group,
                  d.weight_kg, d.region_code, d.latitude, d.longitude, d.is_available,
-                 d.created_at, u.full_name, u.email
+                 d.created_at, u.full_name, ${emailField}
                  ${eligibilitySelect}
             FROM donor d
             JOIN app_user u ON u.user_id = d.user_id
@@ -121,11 +125,13 @@ router.get('/:donor_id', authenticate, authorizeRoles('bb_officer', 'admin', 'la
       return res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'Invalid donor_id' } });
     }
 
+    const emailField = req.user.role === 'admin' ? 'u.email' : `'[CONCEALED BY DAC]' AS email`;
+
     const result = await withContext(req.user, async (client) => {
         return await client.query(
           `SELECT d.donor_id, d.user_id, d.date_of_birth, d.gender, d.blood_group,
                   d.weight_kg, d.region_code, d.latitude, d.longitude, d.is_available,
-                  d.created_at, u.full_name, u.email,
+                  d.created_at, u.full_name, ${emailField},
                   v.last_donated_at, v.next_eligible_on, v.is_eligible
              FROM donor d
              JOIN app_user u ON u.user_id = d.user_id

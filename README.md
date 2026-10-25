@@ -33,7 +33,7 @@ PulseNet provides dedicated, customized interfaces and service boundaries for ea
 - **Mandatory Access Control (MAC)**: Enforced via PostgreSQL `FORCE ROW LEVEL SECURITY`. Every database session sets `app.user_id`, `app.role`, and `app.clearance` within transaction boundaries.
 - **Discretionary Access Control (DAC)**: The API connects via unprivileged user `bb_app`, assuming localized database roles (`bb_admin`, `bb_officer`, etc.) per request transaction. Sensitive columns like `password_hash` and `donor_contact` are restricted at the database catalog level.
 - **Field-Level Encryption (`pgcrypto`)**: Donor phone numbers, email addresses, and residential addresses are stored as AES-256 encrypted bytea columns (`phone_enc`, `email_enc`, `address_enc`).
-- **Cryptographic Audit Trail**: All security-critical events (logins, status changes, PII reveals, blood allocations) are logged into MongoDB with SHA-256 cryptographic hash chaining (`prev_hash` $\to$ `curr_hash`), verifiable for zero-tampering.
+- **Cryptographic Audit Trail**: All security-critical events (logins, status changes, PII reveals, blood allocations) are logged into MongoDB with SHA-256 cryptographic hash chaining (`prev_hash` → `curr_hash`), verifiable for zero-tampering.
 - **Stock Ledger Partitioning**: High-volume `stock_movement` records are list-partitioned by regional zones (`SUR`, `AHM`, `VAD`, `RAJ`) for optimal query isolation.
 
 ---
@@ -92,30 +92,81 @@ CORS_ORIGIN=http://localhost:5173
 
 ---
 
-### 4. Database Setup & Seeding
+### 4. Database Setup & Initialization
 
-Run the database setup script to initialize roles, schemas, triggers, RLS policies, and seed data:
+Run the following commands to initialize PostgreSQL roles, schemas, views, stored procedures, RLS security policies, and seed lookups.
 
+#### On Windows (PowerShell):
+*(Direct execution using `psql.exe` — requires no manual PATH configuration):*
+
+```powershell
+# 1) Run superuser script (prompts for your local 'postgres' password once)
+& "C:\Program Files\PostgreSQL\18\bin\psql.exe" -U postgres -f db/00_init_as_superuser.sql
+
+# 2) Build all schemas, procedures, views, security policies & lookups in order as bb_owner
+$psql = "C:\Program Files\PostgreSQL\18\bin\psql.exe"
+$url = "postgresql://bb_owner:owner_pw@localhost:5432/bloodbank"
+@(
+  "db/schema/01_types.sql",
+  "db/schema/02_tables.sql",
+  "db/schema/02b_tables_clinical.sql",
+  "db/schema/03_indexes.sql",
+  "db/views/30_views.sql",
+  "db/functions/20_functions.sql",
+  "db/functions/21_triggers.sql",
+  "db/functions/22_procedures.sql",
+  "db/security/50_rolesgrant.sql",
+  "db/security/51_rls.sql",
+  "db/seed/60_lookups.sql",
+  "db/seed/seed_data.sql"
+) | ForEach-Object { & $psql $url -f $_ }
+```
+
+#### On Linux / macOS (Bash):
 ```bash
-# Initialize PostgreSQL schema, security roles, and initial seed data
+# 1) Run superuser initialization
 psql -U postgres -f db/00_init_as_superuser.sql
-psql "postgresql://bb_owner:owner_pw@localhost:5432/bloodbank" -f db/schema/01_types.sql
-psql "postgresql://bb_owner:owner_pw@localhost:5432/bloodbank" -f db/schema/02_tables.sql
-psql "postgresql://bb_owner:owner_pw@localhost:5432/bloodbank" -f db/schema/02b_tables_clinical.sql
-psql "postgresql://bb_owner:owner_pw@localhost:5432/bloodbank" -f db/schema/03_indexes.sql
-psql "postgresql://bb_owner:owner_pw@localhost:5432/bloodbank" -f db/views/30_views.sql
-psql "postgresql://bb_owner:owner_pw@localhost:5432/bloodbank" -f db/functions/20_functions.sql
-psql "postgresql://bb_owner:owner_pw@localhost:5432/bloodbank" -f db/functions/21_triggers.sql
-psql "postgresql://bb_owner:owner_pw@localhost:5432/bloodbank" -f db/functions/22_procedures.sql
-psql "postgresql://bb_owner:owner_pw@localhost:5432/bloodbank" -f db/security/50_rolesgrant.sql
-psql "postgresql://bb_owner:owner_pw@localhost:5432/bloodbank" -f db/security/51_rls.sql
-psql "postgresql://bb_owner:owner_pw@localhost:5432/bloodbank" -f db/seed/60_lookups.sql
-psql "postgresql://bb_owner:owner_pw@localhost:5432/bloodbank" -f db/seed/seed_data.sql
+
+# 2) Run schemas and seed data as bb_owner
+URL="postgresql://bb_owner:owner_pw@localhost:5432/bloodbank"
+for f in \
+  db/schema/01_types.sql \
+  db/schema/02_tables.sql \
+  db/schema/02b_tables_clinical.sql \
+  db/schema/03_indexes.sql \
+  db/views/30_views.sql \
+  db/functions/20_functions.sql \
+  db/functions/21_triggers.sql \
+  db/functions/22_procedures.sql \
+  db/security/50_rolesgrant.sql \
+  db/security/51_rls.sql \
+  db/seed/60_lookups.sql \
+  db/seed/seed_data.sql; do
+    psql "$URL" -f "$f"
+done
 ```
 
 ---
 
-### 5. Start the Services
+### 5. Dummy Data Insertion & Utility Scripts
+
+The project includes deterministic datasets and built-in automation scripts for database seeding, maintenance, and role testing:
+
+#### Seed & Dummy Data Files
+- **`db/seed/60_lookups.sql`**: Master reference data for geographic regions (`SUR`, `AHM`, `VAD`, `RAJ`), Bell-LaPadula clearance roles, component shelf-life specifications (`component_spec`), and blood bank branches.
+- **`db/seed/seed_data.sql`**: Comprehensive SQL seed script inserting 80+ diverse voluntary donors, 9 affiliated hospitals, pre-tested blood units across all component types, and pre-configured staff accounts.
+
+#### Pre-Configured Automation Scripts (`scripts/`)
+| Script / NPM Command | Description |
+| :--- | :--- |
+| **`npm run db:setup`** | Node.js script (`scripts/db-setup.js`) executing all SQL migration scripts in sequence using the `pg` client. |
+| **`npm run db:seed`** | Deterministic data generator (`scripts/seed.js`) generating clinical donations, 5-point lab screenings, stock units, hospital requests, allocations, and emergency alerts. |
+| **`npm run db:reset`** | Full reset command (`scripts/db-reset.js`) that drops, rebuilds, and reseeds the entire database to a clean testing state. |
+| **`node scripts/test-all-roles-e2e.js`** | Automated end-to-end integration test verifying authentication, DAC column redactions, RLS tenant isolation, and workflows across all 6 roles. |
+
+---
+
+### 6. Start the Services
 
 Open two terminal sessions:
 
@@ -167,6 +218,11 @@ All seeded demo accounts use the standard password: `Test@1234`
 │   ├── security/           # DAC (Role Grants) & MAC (Row-Level Security)
 │   ├── seed/               # Reference lookups & sample dataset
 │   └── docs/               # 3NF Proofs, ER Diagram & Technical Reports
+├── scripts/                # Database automation & E2E verification test suites
+│   ├── db-setup.js         # Automated schema migration runner
+│   ├── seed.js             # Deterministic mock dataset generator
+│   ├── db-reset.js         # Complete drop, rebuild, and reseed utility
+│   └── test-all-roles-e2e.js # Multi-role integration verification test
 ├── web/                    # React 18 + Vite Web Application
 │   ├── src/
 │   │   ├── components/     # Layout, Sidebar, Modals, Badges, Metrics

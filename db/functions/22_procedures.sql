@@ -7,7 +7,7 @@
 \pset pager off
 
 -- 1) FEFO allocation (runs with the CALLER's privileges, so DAC and RLS apply) ----
-CREATE FUNCTION fn_allocate_fefo(p_request_id int, p_user_id int)
+CREATE OR REPLACE FUNCTION fn_allocate_fefo(p_request_id int, p_user_id int)
 RETURNS int
 LANGUAGE plpgsql
 SET search_path = pg_catalog, public
@@ -65,7 +65,7 @@ END
 $$;
 
 -- 2) Expiry sweep ----------------------------------------------------------------
-CREATE FUNCTION fn_expire_units()
+CREATE OR REPLACE FUNCTION fn_expire_units()
 RETURNS int
 LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = pg_catalog, public
@@ -84,7 +84,7 @@ $$;
 
 -- 3) Public donor registration -------------------------------------------------------
 -- The caller must set app.enc_key in the same transaction (set_config(..., true)).
-CREATE FUNCTION fn_register_donor(
+CREATE OR REPLACE FUNCTION fn_register_donor(
     p_email         text,
     p_password_hash text,
     p_full_name     text,
@@ -167,11 +167,11 @@ WHERE pronamespace = 'public'::regnamespace
   AND proname IN ('fn_allocate_fefo', 'fn_expire_units', 'fn_register_donor')
 ORDER BY proname;
 -- 4) Emergency donor search within radius (Haversine, pure SQL)
-CREATE FUNCTION fn_find_donors_for_request(p_request_id int, p_radius_km numeric DEFAULT 50.0)
+CREATE OR REPLACE FUNCTION fn_find_donors_for_request(p_request_id int, p_radius_km numeric DEFAULT 50.0)
 RETURNS TABLE (donor_id int, blood_group blood_group_t, distance_km numeric, is_available boolean, next_eligible_on date)
 LANGUAGE plpgsql STABLE
 SET search_path = pg_catalog, public
-AS 
+AS $$
 DECLARE
     v_req  blood_request%ROWTYPE;
     v_hosp hospital%ROWTYPE;
@@ -201,6 +201,6 @@ BEGIN
        AND fn_distance_km(v_hosp.latitude::float8, v_hosp.longitude::float8, dn.latitude::float8, dn.longitude::float8) <= p_radius_km
      ORDER BY distance_km ASC;
 END;
-;
+$$;
 
 COMMENT ON FUNCTION fn_find_donors_for_request(int, numeric) IS 'Find eligible and available donors for an emergency blood request within a given radius (km), nearest first.';

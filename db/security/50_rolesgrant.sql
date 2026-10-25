@@ -12,7 +12,7 @@ GRANT USAGE ON SCHEMA public
     TO bb_admin, bb_officer, bb_lab_tech, bb_hospital, bb_donor, bb_auditor, bb_app;
 
 -- 1) Login support for the API (bb_app gets NO table access) ----------------
-CREATE FUNCTION fn_auth_lookup(p_email text)
+CREATE OR REPLACE FUNCTION fn_auth_lookup(p_email text)
 RETURNS TABLE (user_id int, password_hash text, full_name text, role_name text,
                clearance smallint, branch_id int, hospital_id int, donor_id int,
                is_active boolean, failed_attempts smallint, locked_until timestamptz)
@@ -28,7 +28,7 @@ AS $$
 $$;
 
 -- success resets the counter; the 5th consecutive failure locks the account for 15 minutes
-CREATE FUNCTION fn_auth_record_attempt(p_user_id int, p_success boolean)
+CREATE OR REPLACE FUNCTION fn_auth_record_attempt(p_user_id int, p_success boolean)
 RETURNS void
 LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = pg_catalog, public
@@ -53,20 +53,20 @@ REVOKE ALL ON FUNCTION fn_auth_record_attempt(int, boolean) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION fn_auth_lookup(text)               TO bb_app;
 GRANT EXECUTE ON FUNCTION fn_auth_record_attempt(int, boolean) TO bb_app;
 
-CREATE FUNCTION fn_auth_lookup_by_id(p_user_id int)
+CREATE OR REPLACE FUNCTION fn_auth_lookup_by_id(p_user_id int)
 RETURNS TABLE (user_id int, email text, full_name text, role_name text,
                clearance smallint, branch_id int, hospital_id int, donor_id int,
                is_active boolean)
 LANGUAGE sql STABLE SECURITY DEFINER
 SET search_path = pg_catalog, public
-AS 
+AS $$
     SELECT u.user_id, u.email, u.full_name, u.role_name, r.clearance,
            u.branch_id, u.hospital_id, d.donor_id, u.is_active
       FROM app_user u
       JOIN role_def r   ON r.role_name = u.role_name
       LEFT JOIN donor d ON d.user_id   = u.user_id
-     WHERE u.user_id = p_user_id
-;
+     WHERE u.user_id = p_user_id;
+$$;
 
 REVOKE ALL ON FUNCTION fn_auth_lookup_by_id(int)               FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION fn_auth_lookup_by_id(int)           TO bb_app;

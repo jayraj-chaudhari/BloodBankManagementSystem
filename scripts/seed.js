@@ -163,9 +163,13 @@ async function seedDatabase() {
         RETURNING donor_id;
       `, [uid, dob, gender, bg, weight, region]);
 
-      if (dRes.rows.length > 0) {
-        const did = dRes.rows[0].donor_id;
-        donorIds.push(did);
+      let did = dRes.rows[0]?.donor_id;
+      if (!did) {
+        const existRes = await client.query('SELECT donor_id FROM donor WHERE user_id = $1', [uid]);
+        did = existRes.rows[0]?.donor_id;
+      }
+      if (did) {
+        if (!donorIds.includes(did)) donorIds.push(did);
 
         await client.query(`
           INSERT INTO donor_contact (donor_id, phone_enc, email_enc, address_enc)

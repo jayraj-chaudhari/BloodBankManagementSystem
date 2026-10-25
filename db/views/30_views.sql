@@ -4,10 +4,16 @@
 --   psql "postgresql://bb_owner:owner_pw@localhost:5432/bloodbank" -f db/views/30_views.sql
 -- ============================================================
 \set ON_ERROR_STOP on
+
+-- Pre-create gap days function in case views run before triggers
+CREATE OR REPLACE FUNCTION fn_donation_gap_days(p_gender character)
+RETURNS int LANGUAGE sql IMMUTABLE
+AS $$ SELECT CASE WHEN p_gender = 'F' THEN 120 ELSE 90 END $$;
+
 \pset pager off
 
 -- 1) Hospital-safe stock counts (aggregates only; owner's rights on purpose)
-CREATE VIEW v_public_inventory AS
+CREATE OR REPLACE VIEW v_public_inventory AS
 SELECT b.branch_id, b.branch_name, b.region_code,
        dn.blood_group, u.component,
        count(*)::int AS units_available
@@ -20,7 +26,7 @@ WHERE u.status = 'AVAILABLE'
 GROUP BY b.branch_id, b.branch_name, b.region_code, dn.blood_group, u.component;
 
 -- 2) Full inventory for staff
-CREATE VIEW v_inventory AS
+CREATE OR REPLACE VIEW v_inventory AS
 SELECT b.branch_id, b.branch_name, b.region_code,
        dn.blood_group, u.component,
        count(*) FILTER (WHERE u.status = 'AVAILABLE'
@@ -39,7 +45,7 @@ WHERE u.status IN ('QUARANTINE', 'AVAILABLE', 'RESERVED')
 GROUP BY b.branch_id, b.branch_name, b.region_code, dn.blood_group, u.component;
 
 -- 3) Donor eligibility (medical rules only; is_available = willing to be contacted)
-CREATE VIEW v_donor_eligibility AS
+CREATE OR REPLACE VIEW v_donor_eligibility AS
 SELECT dn.donor_id, dn.blood_group, dn.region_code, dn.gender, dn.is_available,
        l.last_donated_at,
        CASE WHEN l.last_donated_at IS NULL THEN NULL
@@ -56,7 +62,7 @@ LEFT JOIN (SELECT donor_id, max(donated_at) AS last_donated_at
              FROM donation GROUP BY donor_id) l ON l.donor_id = dn.donor_id;
 
 -- 4) Request summary (caller's own RLS applies: security_invoker)
-CREATE VIEW v_request_summary WITH (security_invoker = true) AS
+CREATE OR REPLACE VIEW v_request_summary WITH (security_invoker = true) AS
 SELECT r.request_id, r.hospital_id, h.hospital_name,
        r.blood_group, r.component, r.units_needed,
        (SELECT count(*)::int FROM request_allocation a

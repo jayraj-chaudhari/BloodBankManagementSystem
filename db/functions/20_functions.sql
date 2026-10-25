@@ -147,3 +147,8 @@ SELECT proname, pg_get_function_identity_arguments(oid) AS args
 FROM pg_proc
 WHERE pronamespace = 'public'::regnamespace AND proname LIKE 'fn\_%'
 ORDER BY proname;
+
+-- Pre-create gap days function in case views run before triggers
+CREATE OR REPLACE FUNCTION fn_donation_gap_days(p_gender character)
+RETURNS int LANGUAGE sql IMMUTABLE
+AS $$ SELECT CASE WHEN p_gender = 'F' THEN 120 ELSE 90 END $$;

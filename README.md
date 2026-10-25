@@ -111,9 +111,9 @@ $url = "postgresql://bb_owner:owner_pw@localhost:5432/bloodbank"
   "db/schema/02_tables.sql",
   "db/schema/02b_tables_clinical.sql",
   "db/schema/03_indexes.sql",
-  "db/views/30_views.sql",
   "db/functions/20_functions.sql",
   "db/functions/21_triggers.sql",
+  "db/views/30_views.sql",
   "db/functions/22_procedures.sql",
   "db/security/50_rolesgrant.sql",
   "db/security/51_rls.sql",
@@ -134,9 +134,9 @@ for f in \
   db/schema/02_tables.sql \
   db/schema/02b_tables_clinical.sql \
   db/schema/03_indexes.sql \
-  db/views/30_views.sql \
   db/functions/20_functions.sql \
   db/functions/21_triggers.sql \
+  db/views/30_views.sql \
   db/functions/22_procedures.sql \
   db/security/50_rolesgrant.sql \
   db/security/51_rls.sql \

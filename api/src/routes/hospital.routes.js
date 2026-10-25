@@ -31,7 +31,9 @@ router.get('/', authenticate, async (req, res, next) => {
 
     query += ` ORDER BY hospital_id`;
 
-    const result = await pool.query(query, params);
+    const result = await withContext(req.user, async (client) => {
+      return await client.query(query, params);
+    });
 
     return res.status(200).json({
       data: result.rows,

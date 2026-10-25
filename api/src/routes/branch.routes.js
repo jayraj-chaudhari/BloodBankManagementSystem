@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { pool } = require('../db/pg');
 const { authenticate } = require('../middleware/auth');
+const { withContext } = require('../middleware/withContext');
 
 // GET /api/v1/branches (any authenticated user)
 router.get('/', authenticate, async (req, res, next) => {
@@ -23,7 +24,9 @@ router.get('/', authenticate, async (req, res, next) => {
 
     query += ` ORDER BY branch_id`;
 
-    const result = await pool.query(query, params);
+    const result = await withContext(req.user, async (client) => {
+      return await client.query(query, params);
+    });
 
     return res.status(200).json({
       data: result.rows,

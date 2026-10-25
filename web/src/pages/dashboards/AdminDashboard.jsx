@@ -80,13 +80,16 @@ export default function AdminDashboard() {
     e.preventDefault();
     try {
       setActionLoading(true);
+      const isBranchRole = ['bb_officer', 'lab_tech'].includes(userForm.role_name);
+      const isHospitalRole = userForm.role_name === 'hospital_user';
+
       const payload = {
         email: userForm.email,
         password: userForm.password,
         full_name: userForm.full_name,
         role_name: userForm.role_name,
-        branch_id: userForm.branch_id ? Number(userForm.branch_id) : undefined,
-        hospital_id: userForm.hospital_id ? Number(userForm.hospital_id) : undefined
+        branch_id: isBranchRole && userForm.branch_id ? Number(userForm.branch_id) : undefined,
+        hospital_id: isHospitalRole && userForm.hospital_id ? Number(userForm.hospital_id) : undefined
       };
 
       await adminApi.createUser(payload);
@@ -546,7 +549,15 @@ export default function AdminDashboard() {
             <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)' }}>Role Designation *</label>
             <select
               value={userForm.role_name}
-              onChange={(e) => setUserForm({ ...userForm, role_name: e.target.value })}
+              onChange={(e) => {
+                const newRole = e.target.value;
+                setUserForm((prev) => ({
+                  ...prev,
+                  role_name: newRole,
+                  branch_id: ['bb_officer', 'lab_tech'].includes(newRole) ? (prev.branch_id || (branches[0]?.branch_id ? String(branches[0].branch_id) : '')) : '',
+                  hospital_id: newRole === 'hospital_user' ? (prev.hospital_id || (hospitals[0]?.hospital_id ? String(hospitals[0].hospital_id) : '')) : ''
+                }));
+              }}
               style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)', marginTop: '4px' }}
             >
               <option value="bb_officer">Blood Bank Officer (Requires Branch)</option>

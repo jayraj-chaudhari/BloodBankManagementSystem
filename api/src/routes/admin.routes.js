@@ -68,6 +68,25 @@ router.post('/users', authenticate, authorizeRoles('admin'), validate(createUser
       });
     }
 
+    // Sanitize affiliations to strictly satisfy database CHECK constraint app_user_check:
+    // - hospital_user: hospital_id IS NOT NULL AND branch_id IS NULL
+    // - bb_officer, lab_tech: branch_id IS NOT NULL AND hospital_id IS NULL
+    // - admin, auditor: hospital_id IS NULL
+    // - donor: branch_id IS NULL AND hospital_id IS NULL
+    let cleanBranchId = null;
+    let cleanHospitalId = null;
+
+    if (role_name === 'hospital_user') {
+      cleanHospitalId = Number(hospital_id);
+      cleanBranchId = null;
+    } else if (['bb_officer', 'lab_tech'].includes(role_name)) {
+      cleanBranchId = Number(branch_id);
+      cleanHospitalId = null;
+    } else if (['admin', 'auditor'].includes(role_name)) {
+      cleanBranchId = branch_id ? Number(branch_id) : null;
+      cleanHospitalId = null;
+    }
+
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
 
@@ -76,7 +95,7 @@ router.post('/users', authenticate, authorizeRoles('admin'), validate(createUser
         `INSERT INTO app_user (email, password_hash, full_name, role_name, branch_id, hospital_id)
          VALUES ($1, $2, $3, $4, $5, $6)
          RETURNING user_id, email, full_name, role_name, branch_id, hospital_id, created_at`,
-        [cleanEmail, passwordHash, full_name, role_name, branch_id || null, hospital_id || null]
+        [cleanEmail, passwordHash, full_name, role_name, cleanBranchId, cleanHospitalId]
       );
       return result.rows[0];
     });

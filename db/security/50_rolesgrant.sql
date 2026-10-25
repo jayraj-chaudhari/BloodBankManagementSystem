@@ -104,17 +104,17 @@ GRANT UPDATE (weight_kg, region_code, latitude, longitude, is_available) ON dono
 GRANT SELECT ON donor_contact TO bb_officer, bb_donor;                              -- ciphertext only
 GRANT INSERT (donor_id, phone_enc, email_enc, address_enc, key_version) ON donor_contact TO bb_officer;
 GRANT UPDATE (phone_enc, email_enc, address_enc, key_version) ON donor_contact TO bb_officer, bb_donor;
-GRANT EXECUTE ON FUNCTION fn_encrypt_text(text), fn_decrypt_text(bytea) TO bb_officer, bb_donor;
+GRANT EXECUTE ON FUNCTION fn_encrypt_text(text), fn_decrypt_text(bytea) TO bb_officer, bb_admin, bb_donor;
 
 -- 5) Donations, units, screening ---------------------------------------------------------------
 GRANT SELECT ON donation TO bb_admin, bb_officer, bb_lab_tech, bb_donor, bb_auditor;
 GRANT INSERT (donor_id, branch_id, donated_at, volume_ml, hemoglobin_gdl, collected_by)
     ON donation TO bb_officer;
-GRANT UPDATE (volume_ml, hemoglobin_gdl) ON donation TO bb_officer;
+GRANT UPDATE (volume_ml, hemoglobin_gdl) ON donation TO bb_officer, bb_admin;
 
 GRANT SELECT ON blood_unit TO bb_admin, bb_officer, bb_lab_tech, bb_auditor;
-GRANT INSERT (donation_id, component, volume_ml, storage_location) ON blood_unit TO bb_officer;
-GRANT UPDATE (status, storage_location) ON blood_unit TO bb_officer;
+GRANT INSERT (donation_id, component, volume_ml, storage_location) ON blood_unit TO bb_officer, bb_admin;
+GRANT UPDATE (status, storage_location) ON blood_unit TO bb_officer, bb_admin;
 
 GRANT SELECT ON screening_result TO bb_lab_tech, bb_donor;                          -- donor: own rows via RLS
 GRANT INSERT (donation_id, test_type, result, report, tested_by) ON screening_result TO bb_lab_tech;
@@ -128,7 +128,7 @@ GRANT UPDATE (status, urgency, needed_by) ON blood_request TO bb_officer, bb_adm
 GRANT UPDATE (status) ON blood_request TO bb_hospital;                              -- cancel own (RLS enforces)
 
 GRANT SELECT ON request_allocation TO bb_admin, bb_officer, bb_hospital, bb_auditor;
-GRANT INSERT (request_id, unit_id, allocated_by) ON request_allocation TO bb_officer;
+GRANT INSERT (request_id, unit_id, allocated_by) ON request_allocation TO bb_officer, bb_admin;
 
 GRANT SELECT ON donor_alert TO bb_admin, bb_officer, bb_donor, bb_auditor;
 GRANT INSERT (request_id, donor_id, distance_km) ON donor_alert TO bb_officer, bb_admin;
@@ -142,7 +142,7 @@ GRANT SELECT ON v_inventory        TO bb_admin, bb_officer, bb_lab_tech, bb_audi
 GRANT SELECT ON v_donor_eligibility TO bb_admin, bb_officer, bb_lab_tech, bb_donor, bb_auditor;
 GRANT SELECT ON v_request_summary  TO bb_admin, bb_officer, bb_hospital, bb_auditor;
 
-GRANT EXECUTE ON FUNCTION fn_allocate_fefo(int, int) TO bb_officer;
+GRANT EXECUTE ON FUNCTION fn_allocate_fefo(int, int) TO bb_officer, bb_admin;
 GRANT EXECUTE ON FUNCTION fn_find_donors_for_request(int, numeric) TO bb_admin, bb_officer;
 GRANT EXECUTE ON FUNCTION fn_expire_units()          TO bb_admin, bb_officer;
 

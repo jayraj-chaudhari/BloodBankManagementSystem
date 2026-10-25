@@ -94,11 +94,19 @@ CORS_ORIGIN=http://localhost:5173
 
 ### 4. Database Setup & Seeding
 
-Run the database setup script to initialize roles, schemas, triggers, RLS policies, and seed data:
+> 💡 **PostgreSQL Password Tip**:  
+> The first command runs as the `postgres` superuser and will prompt for your local PostgreSQL password. To run it smoothly without manual prompts, set your password in your terminal session before running:
+> - **PowerShell (Windows)**: `$env:PGPASSWORD="your_postgres_password"`
+> - **Command Prompt (cmd)**: `set PGPASSWORD=your_postgres_password`
+> - **Bash (Linux / macOS)**: `export PGPASSWORD="your_postgres_password"`
+>
+> *(All subsequent scripts connect as `bb_owner` using the connection string with the pre-configured password `owner_pw`).*
 
 ```bash
-# Initialize PostgreSQL schema, security roles, and initial seed data
+# 1) Initialize database and create roles (run as postgres superuser)
 psql -U postgres -f db/00_init_as_superuser.sql
+
+# 2) Run schemas, security policies, and seed data as bb_owner
 psql "postgresql://bb_owner:owner_pw@localhost:5432/bloodbank" -f db/schema/01_types.sql
 psql "postgresql://bb_owner:owner_pw@localhost:5432/bloodbank" -f db/schema/02_tables.sql
 psql "postgresql://bb_owner:owner_pw@localhost:5432/bloodbank" -f db/schema/02b_tables_clinical.sql

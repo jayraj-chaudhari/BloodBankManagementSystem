@@ -58,10 +58,11 @@ function errorHandler(err, req, res, next) {
   if (err.code) {
     // 23505: unique_violation
     if (err.code === '23505') {
+      const isEmail = err.constraint === 'app_user_email_key' || (err.detail && err.detail.toLowerCase().includes('email'));
       return res.status(409).json({
         error: {
-          code: 'CONFLICT',
-          message: 'Resource violates uniqueness constraint or already exists'
+          code: isEmail ? 'EMAIL_TAKEN' : 'CONFLICT',
+          message: isEmail ? 'An account with this email already exists' : 'Resource violates uniqueness constraint or already exists'
         }
       });
     }

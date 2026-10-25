@@ -88,7 +88,9 @@ export default function RequisitionsPage() {
   };
 
   const handleExportXml = (requestId) => {
-    window.open(`/api/v1/export/requests/${requestId}.xml`, '_blank');
+    const token = localStorage.getItem('bb_token');
+    const url = token ? `/api/v1/export/requests/${requestId}.xml?token=${encodeURIComponent(token)}` : `/api/v1/export/requests/${requestId}.xml`;
+    window.open(url, '_blank');
   };
 
   return (

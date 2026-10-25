@@ -1,68 +1,82 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { io } from 'socket.io-client';
 import { useAuth } from './AuthContext';
+import { useToast } from './ToastContext';
 
 const SocketContext = createContext(null);
 
-const SOCKET_SERVER_URL = 'http://localhost:3000';
-
 export function SocketProvider({ children }) {
-  const { token, user } = useAuth();
+  const { user } = useAuth();
+  const toast = useToast();
   const [socket, setSocket] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
   const [liveAlerts, setLiveAlerts] = useState([]);
   const [lastInventoryEvent, setLastInventoryEvent] = useState(null);
 
   useEffect(() => {
-    // Connect directly to the Node API server (avoiding fragile Vite ws proxy)
-    const newSocket = io(SOCKET_SERVER_URL, {
-      transports: ['polling', 'websocket'],
-      autoConnect: true,
-      reconnection: true,
+    // Connect directly to backend port with automatic reconnection & transports
+    const socketUrl = import.meta.env.VITE_WS_URL || 'http://localhost:3000';
+    const s = io(socketUrl, {
+      transports: ['websocket', 'polling'],
       reconnectionAttempts: 10,
-      reconnectionDelay: 3000,
-      timeout: 5000
+      reconnectionDelay: 2000,
+      autoConnect: true
     });
 
-    newSocket.on('connect', () => {
+    s.on('connect', () => {
       setIsConnected(true);
-      if (token) {
-        newSocket.emit('authenticate', token);
+      // Join role room if user is authenticated
+      if (user?.role) {
+        s.emit('join', `role:${user.role}`);
+        if (user.donor_id) {
+          s.emit('join', `donor:${user.donor_id}`);
+        }
+        if (user.hospital_id) {
+          s.emit('join', `hospital:${user.hospital_id}`);
+        }
       }
     });
 
-    newSocket.on('disconnect', () => {
+    s.on('disconnect', () => {
       setIsConnected(false);
     });
 
-    newSocket.on('connect_error', () => {
-      setIsConnected(false);
+    // Listen for live emergency alerts
+    s.on('emergency_alert', (data) => {
+      setLiveAlerts((prev) => [data, ...prev]);
+      toast.warning(
+        `Critical Need: ${data.blood_group} ${data.component || 'Whole Blood'} at ${data.hospital_name || 'Hospital'}. Distance: ${data.distance_km || 'Nearby'} km`,
+        '🚨 EMERGENCY BLOOD ALERT'
+      );
     });
 
-    newSocket.on('emergency_alert', (data) => {
-      setLiveAlerts((prev) => [data, ...prev.slice(0, 9)]);
-    });
-
-    newSocket.on('emergency_alert_broadcast', (data) => {
-      setLiveAlerts((prev) => [data, ...prev.slice(0, 9)]);
-    });
-
-    newSocket.on('inventory_update', (data) => {
+    // Listen for inventory updates
+    s.on('inventory_update', (data) => {
       setLastInventoryEvent(data);
+      if (['admin', 'bb_officer', 'hospital_user'].includes(user?.role)) {
+        toast.info(
+          `Unit ${data.unit_code || ''} is now ${data.status} (${data.component || ''})`,
+          'Inventory Update'
+        );
+      }
     });
 
-    setSocket(newSocket);
+    // Listen for request status updates
+    s.on('request_update', (data) => {
+      toast.info(
+        `Request #${data.request_id || ''} status updated to ${data.status}`,
+        'Requisition Status'
+      );
+    });
+
+    setSocket(s);
 
     return () => {
-      newSocket.disconnect();
+      s.disconnect();
     };
-  }, [token]);
+  }, [user]);
 
-  useEffect(() => {
-    if (socket && isConnected && token) {
-      socket.emit('authenticate', token);
-    }
-  }, [socket, isConnected, token, user]);
+  const clearAlerts = () => setLiveAlerts([]);
 
   return (
     <SocketContext.Provider
@@ -71,7 +85,7 @@ export function SocketProvider({ children }) {
         isConnected,
         liveAlerts,
         lastInventoryEvent,
-        clearAlerts: () => setLiveAlerts([])
+        clearAlerts
       }}
     >
       {children}
@@ -80,5 +94,9 @@ export function SocketProvider({ children }) {
 }
 
 export function useSocket() {
-  return useContext(SocketContext) || { isConnected: false, liveAlerts: [] };
+  const context = useContext(SocketContext);
+  if (!context) {
+    throw new Error('useSocket must be used within a SocketProvider');
+  }
+  return context;
 }

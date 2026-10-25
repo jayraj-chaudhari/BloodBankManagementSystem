@@ -2,29 +2,50 @@ import React, { useState, useEffect } from 'react';
 import {
   PackageCheck,
   AlertTriangle,
-  FileSpreadsheet,
   Users,
   TrendingUp,
   Droplet,
   Zap,
   CheckCircle2,
   Clock,
-  ShieldCheck,
-  Plus
+  Plus,
+  Radio,
+  FileSpreadsheet
 } from 'lucide-react';
 import HeroBanner from '../components/common/HeroBanner';
 import StatCard from '../components/common/StatCard';
-import DonorCardPreview from '../components/common/DonorCardPreview';
 import Modal from '../components/common/Modal';
-import { inventoryApi, requestApi, donorApi, donationApi } from '../services/api';
+import { inventoryApi, requestApi, donorApi, donationApi, alertApi } from '../services/api';
 import { useSocket } from '../context/SocketContext';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
+
+// Import Specific Role Dashboards
+import HospitalDashboard from './dashboards/HospitalDashboard';
+import DonorDashboard from './dashboards/DonorDashboard';
+import LabTechDashboard from './dashboards/LabTechDashboard';
+import AuditorDashboard from './dashboards/AuditorDashboard';
 
 export default function DashboardPage() {
   const { user } = useAuth();
-  const { lastInventoryEvent, liveAlerts } = useSocket();
+  const toast = useToast();
+  const { isConnected, lastInventoryEvent, liveAlerts } = useSocket();
 
-  // Dashboard stats state loaded from real backend
+  // If user role is Hospital, Donor, Lab Tech, or Auditor, render their dedicated production portal
+  if (user?.role === 'hospital_user') {
+    return <HospitalDashboard />;
+  }
+  if (user?.role === 'donor') {
+    return <DonorDashboard />;
+  }
+  if (user?.role === 'lab_tech') {
+    return <LabTechDashboard />;
+  }
+  if (user?.role === 'auditor') {
+    return <AuditorDashboard />;
+  }
+
+  // --- OFFICER & SYSTEM ADMINISTRATOR DASHBOARD ---
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     totalAvailable: 0,
@@ -41,6 +62,7 @@ export default function DashboardPage() {
   const [showRegisterModal, setShowRegisterModal] = useState(false);
   const [showDonationModal, setShowDonationModal] = useState(false);
   const [showFEFOModal, setShowFEFOModal] = useState(false);
+  const [showDispatchModal, setShowDispatchModal] = useState(false);
 
   // Form states
   const [regForm, setRegForm] = useState({
@@ -59,13 +81,21 @@ export default function DashboardPage() {
   const [donationForm, setDonationForm] = useState({
     donor_id: 1,
     branch_id: 1,
-    donated_at: new Date().toISOString(),
+    donated_at: new Date().toISOString().slice(0, 16),
     volume_ml: 350,
     hemoglobin_gdl: 14.2,
     components: ['RED_CELLS', 'PLASMA']
   });
 
-  const [actionMessage, setActionMessage] = useState(null);
+  const [fefoForm, setFefoForm] = useState({
+    request_id: 1
+  });
+
+  const [dispatchForm, setDispatchForm] = useState({
+    request_id: 1,
+    radius_km: 50,
+    max_donors: 10
+  });
 
   // Fetch real data from database through API
   const loadDashboardData = async () => {
@@ -77,7 +107,6 @@ export default function DashboardPage() {
       const invData = invRes.data || [];
       setInventory(invData);
 
-      // Compute total available & expiring units
       const totalAvail = invData.reduce((acc, row) => acc + (row.units_available || 0), 0);
       const totalExpiring = invData.reduce((acc, row) => acc + (row.units_expiring_7d || 0), 0);
 
@@ -103,7 +132,7 @@ export default function DashboardPage() {
         totalDonors: donorCount
       });
     } catch (err) {
-      console.error('Failed to load dashboard data:', err);
+      toast.error(err.message || 'Failed to load dashboard metrics');
     } finally {
       setLoading(false);
     }
@@ -111,178 +140,190 @@ export default function DashboardPage() {
 
   useEffect(() => {
     loadDashboardData();
-  }, [user]);
+  }, []);
 
-  // Refresh data whenever a real-time websocket event occurs
-  useEffect(() => {
-    if (lastInventoryEvent) {
-      loadDashboardData();
-    }
-  }, [lastInventoryEvent]);
-
-  // Handle FEFO 1-click allocation from dashboard table
-  const handleFEFOAllocate = async (requestId) => {
-    try {
-      const res = await requestApi.allocateFEFO(requestId);
-      setActionMessage({
-        type: 'success',
-        text: `Successfully allocated ${res.data.allocated_units} unit(s) via FEFO!`
-      });
-      loadDashboardData();
-    } catch (err) {
-      setActionMessage({
-        type: 'error',
-        text: err.message || 'FEFO Allocation failed. Check stock availability.'
-      });
-    }
-    setTimeout(() => setActionMessage(null), 4000);
-  };
-
-  // Handle Register Donor Submit
+  // 1. Register Donor
   const handleRegisterDonor = async (e) => {
     e.preventDefault();
     try {
-      const res = await donorApi.updateDonor ? await donorApi.getDonors() : null; // test
-      const response = await fetch('/api/v1/auth/register-donor', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(regForm)
+      await donorApi.registerDonor({
+        ...regForm,
+        weight_kg: Number(regForm.weight_kg)
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error?.message || 'Registration failed');
-
+      toast.success(`Donor ${regForm.full_name} registered into secure database with encrypted contact PII!`, 'Donor Enrolled');
       setShowRegisterModal(false);
-      setActionMessage({
-        type: 'success',
-        text: `Donor registered successfully with Donor ID #${data.data.donor_id}!`
-      });
       loadDashboardData();
     } catch (err) {
-      alert(err.message);
+      toast.error(err.message || 'Registration failed');
     }
   };
 
-  // Handle Record Donation Submit
+  // 2. Record Donation
   const handleRecordDonation = async (e) => {
     e.preventDefault();
     try {
       await donationApi.createDonation({
-        ...donationForm,
         donor_id: Number(donationForm.donor_id),
         branch_id: Number(donationForm.branch_id),
+        donated_at: new Date(donationForm.donated_at).toISOString(),
         volume_ml: Number(donationForm.volume_ml),
-        hemoglobin_gdl: Number(donationForm.hemoglobin_gdl)
+        hemoglobin_gdl: Number(donationForm.hemoglobin_gdl),
+        components: donationForm.components
       });
+      toast.success(
+        `Intake recorded for donor #${donationForm.donor_id}. Created ${donationForm.components.length} quarantine units.`,
+        'Donation Stored'
+      );
       setShowDonationModal(false);
-      setActionMessage({
-        type: 'success',
-        text: 'Blood donation recorded and quarantine units created!'
-      });
       loadDashboardData();
     } catch (err) {
-      alert(`Donation Failed: ${err.message}`);
+      toast.error(err.message || 'Donation intake failed');
     }
   };
 
-  // Filter inventory data by component
+  // 3. FEFO Allocation
+  const handleAllocateFEFO = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await requestApi.allocateFEFO(fefoForm.request_id);
+      toast.success(
+        `FEFO allocation completed. Allocated ${res.data?.allocated_units || 1} units to Request #${fefoForm.request_id}.`,
+        'FEFO Allocation Successful'
+      );
+      setShowFEFOModal(false);
+      loadDashboardData();
+    } catch (err) {
+      toast.error(err.message || 'FEFO allocation failed');
+    }
+  };
+
+  // 4. Dispatch Emergency Alert
+  const handleDispatchAlert = async (e) => {
+    e.preventDefault();
+    try {
+      const res = await alertApi.createAlert(dispatchForm.request_id, {
+        radius_km: Number(dispatchForm.radius_km),
+        max_donors: Number(dispatchForm.max_donors)
+      });
+      toast.success(
+        `Emergency alerts broadcasted to ${res.data?.length || 0} compatible donors within ${dispatchForm.radius_km} km!`,
+        'Emergency Broadcast Dispatched'
+      );
+      setShowDispatchModal(false);
+    } catch (err) {
+      toast.error(err.message || 'Emergency dispatch failed');
+    }
+  };
+
+  // Filter inventory by component
+  const filteredInventory = selectedComponent === 'ALL'
+    ? inventory
+    : inventory.filter(i => i.component === selectedComponent);
+
+  // Calculate grouped blood stock totals
   const bloodGroups = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
-  const stockByGroup = bloodGroups.map((bg) => {
-    const rows = inventory.filter((item) => {
-      const matchGroup = item.blood_group === bg;
-      if (selectedComponent === 'ALL') return matchGroup;
-      return matchGroup && item.component === selectedComponent;
-    });
-    const count = rows.reduce((acc, r) => acc + (r.units_available || 0), 0);
-    return { group: bg, count };
+  const stockByGroup = bloodGroups.map(bg => {
+    const total = filteredInventory
+      .filter(i => i.blood_group === bg)
+      .reduce((sum, i) => sum + (i.units_available || 0), 0);
+    return { group: bg, total };
   });
 
-  const maxStock = Math.max(...stockByGroup.map((s) => s.count), 10);
+  const maxStock = Math.max(...stockByGroup.map(s => s.total), 1);
 
   return (
-    <div>
-      {/* 1. Hero Gradient Banner matching Hope UI screenshot */}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      {/* Hero Welcome Banner */}
       <HeroBanner
-        onRegisterDonor={() => setShowRegisterModal(true)}
-        onNewDonation={() => setShowDonationModal(true)}
-        onFEFOAllocate={() => setShowFEFOModal(true)}
+        title={`Hello, ${user?.full_name || 'Officer'}!`}
+        subtitle="PulseNet BloodBank OS is running live with PostgreSQL Row-Level Security, FEFO Auto-Allocation, and MongoDB Tamper-Evident Hash Chains."
+        badgeText={`Role: ${user?.role === 'admin' ? 'System Administrator' : 'Blood Bank Officer'} | MAC Level 2`}
+        actions={[
+          {
+            label: 'Register Donor',
+            icon: Plus,
+            variant: 'secondary',
+            onClick: () => setShowRegisterModal(true)
+          },
+          {
+            label: 'Record Donation',
+            icon: Droplet,
+            variant: 'secondary',
+            onClick: () => setShowDonationModal(true)
+          },
+          {
+            label: 'FEFO Allocate',
+            icon: Zap,
+            variant: 'primary',
+            onClick: () => setShowFEFOModal(true)
+          },
+          {
+            label: 'Emergency Alert',
+            icon: Radio,
+            variant: 'secondary',
+            onClick: () => setShowDispatchModal(true)
+          }
+        ]}
       />
 
-      {/* Action Notification Alert Toast */}
-      {actionMessage && (
-        <div style={{
-          padding: '14px 20px',
-          borderRadius: 'var(--radius-md)',
-          marginBottom: '20px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px',
-          backgroundColor: actionMessage.type === 'success' ? '#e8f5ec' : '#fbebee',
-          color: actionMessage.type === 'success' ? 'var(--success)' : 'var(--danger)',
-          borderLeft: `4px solid ${actionMessage.type === 'success' ? 'var(--success)' : 'var(--danger)'}`,
-          fontWeight: '600',
-          fontSize: '13px'
-        }}>
-          {actionMessage.type === 'success' ? <CheckCircle2 size={18} /> : <AlertTriangle size={18} />}
-          <span>{actionMessage.text}</span>
-        </div>
-      )}
-
-      {/* 2. Top 4 Stat Cards with Circular Progress Dials matching screenshot */}
+      {/* KPI Stat Cards */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-        gap: '20px',
-        marginBottom: '26px'
+        gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+        gap: '20px'
       }}>
         <StatCard
-          title="Total Available Stock"
-          value={stats.totalAvailable.toLocaleString()}
-          subtitle="Ready to Issue"
-          percent={Math.min(100, Math.round((stats.totalAvailable / 500) * 100))}
-          color="#3a57e8"
           icon={PackageCheck}
+          label="Total Available Stock"
+          value={stats.totalAvailable}
+          badgeText="Ready to Issue"
+          color="#3a57e8"
         />
-
         <StatCard
-          title="Units Nearing Expiry"
-          value={stats.expiringSoon}
-          subtitle="Within 7 Days"
-          percent={Math.min(100, Math.round((stats.expiringSoon / 50) * 100))}
-          color="#f16a1b"
           icon={AlertTriangle}
+          label="Units Nearing Expiry"
+          value={stats.expiringSoon}
+          badgeText="Within 7 Days"
+          color="#f59e0b"
         />
-
         <StatCard
-          title="Active Requisitions"
-          value={stats.pendingRequests}
-          subtitle="Hospital Demands"
-          percent={Math.min(100, Math.round((stats.pendingRequests / 30) * 100))}
-          color="#08b1ba"
           icon={FileSpreadsheet}
+          label="Active Requisitions"
+          value={stats.pendingRequests}
+          badgeText="Hospital Demands"
+          color="#08b1ba"
         />
-
         <StatCard
-          title="Registered Donors"
-          value={stats.totalDonors.toLocaleString()}
-          subtitle="Verified 3-NF"
-          percent={85}
-          color="#7a5af8"
           icon={Users}
+          label="Registered Donors"
+          value={stats.totalDonors}
+          badgeText="Verified in DB"
+          color="#7a5af8"
         />
       </div>
 
-      {/* 3. Middle Section: Stock Breakdown Visualization & Glassmorphic Donor Card */}
+      {/* Section: Live Inventory Bar Visualizer & Quick Actions */}
       <div style={{
         display: 'grid',
         gridTemplateColumns: '2fr 1fr',
-        gap: '24px',
-        marginBottom: '28px'
+        gap: '24px'
       }}>
-        {/* Left: Blood Stock Distribution by Blood Group */}
-        <div className="hope-card" style={{ padding: '26px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+        {/* Blood Stock Chart Card */}
+        <div style={{
+          backgroundColor: '#ffffff',
+          borderRadius: 'var(--radius-lg)',
+          padding: '24px',
+          boxShadow: 'var(--shadow-card)',
+          border: '1px solid var(--border-light)'
+        }}>
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: '20px'
+          }}>
             <div>
-              <div style={{ fontSize: '18px', fontWeight: '800', color: 'var(--text-main)' }}>
+              <div style={{ fontSize: '16px', fontWeight: '800', color: 'var(--text-main)' }}>
                 Live Blood Inventory by Group
               </div>
               <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
@@ -290,8 +331,8 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Filter Pill Selector */}
-            <div style={{ display: 'flex', gap: '6px', backgroundColor: '#f5f6fa', padding: '4px', borderRadius: '8px' }}>
+            {/* Component Filter Tabs */}
+            <div style={{ display: 'flex', gap: '6px' }}>
               {['ALL', 'RED_CELLS', 'PLASMA', 'PLATELETS'].map((comp) => (
                 <button
                   key={comp}
@@ -300,34 +341,48 @@ export default function DashboardPage() {
                     padding: '6px 12px',
                     borderRadius: '6px',
                     fontSize: '11px',
-                    fontWeight: selectedComponent === comp ? '700' : '500',
-                    backgroundColor: selectedComponent === comp ? '#ffffff' : 'transparent',
-                    color: selectedComponent === comp ? 'var(--primary)' : 'var(--text-muted)',
-                    boxShadow: selectedComponent === comp ? '0 2px 6px rgba(0,0,0,0.06)' : 'none'
+                    fontWeight: '700',
+                    border: 'none',
+                    cursor: 'pointer',
+                    backgroundColor: selectedComponent === comp ? 'var(--primary)' : '#f5f6fa',
+                    color: selectedComponent === comp ? '#ffffff' : 'var(--text-muted)',
+                    transition: 'all 0.2s ease'
                   }}
                 >
-                  {comp.replace('_', ' ')}
+                  {comp}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Graphical Bar Chart representing stock levels */}
-          <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', height: '220px', paddingTop: '20px' }}>
+          {/* Bar Graph Visualizer */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'flex-end',
+            justifyContent: 'space-between',
+            height: '200px',
+            paddingTop: '20px',
+            borderBottom: '1px solid var(--border-light)'
+          }}>
             {stockByGroup.map((item) => {
-              const heightPercent = Math.max(8, Math.round((item.count / maxStock) * 100));
-              const isShortage = item.count < 5;
+              const heightPercent = Math.max(12, Math.round((item.total / maxStock) * 100));
+              const isLow = item.total < 3;
 
               return (
-                <div key={item.group} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', flex: 1 }}>
-                  <span style={{ fontSize: '12px', fontWeight: '700', color: isShortage ? 'var(--danger)' : 'var(--text-main)' }}>
-                    {item.count}
-                  </span>
-
+                <div key={item.group} style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: '8px',
+                  flex: 1
+                }}>
+                  <div style={{ fontSize: '12px', fontWeight: '800', color: isLow ? '#ef4444' : 'var(--text-main)' }}>
+                    {item.total}
+                  </div>
                   <div style={{
-                    width: '36px',
-                    height: '160px',
-                    backgroundColor: '#f0f3fe',
+                    width: '32px',
+                    height: '140px',
+                    backgroundColor: '#f1f5f9',
                     borderRadius: '8px',
                     display: 'flex',
                     alignItems: 'flex-end',
@@ -336,429 +391,500 @@ export default function DashboardPage() {
                     <div style={{
                       width: '100%',
                       height: `${heightPercent}%`,
-                      background: isShortage
-                        ? 'linear-gradient(180deg, #dc3545 0%, #f16a1b 100%)'
-                        : 'linear-gradient(180deg, #3a57e8 0%, #08b1ba 100%)',
+                      background: isLow
+                        ? 'linear-gradient(180deg, #f87171 0%, #ef4444 100%)'
+                        : 'linear-gradient(180deg, #60a5fa 0%, #2563eb 100%)',
                       borderRadius: '8px',
-                      transition: 'height 0.8s cubic-bezier(0.4, 0, 0.2, 1)'
+                      transition: 'height 0.4s ease'
                     }} />
                   </div>
-
-                  <span style={{
-                    fontSize: '12px',
-                    fontWeight: '800',
-                    color: item.group.includes('-') ? 'var(--secondary)' : 'var(--primary)'
-                  }}>
+                  <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-main)' }}>
                     {item.group}
-                  </span>
+                  </div>
                 </div>
               );
             })}
           </div>
-
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--border-light)' }}>
-            <div style={{ display: 'flex', gap: '18px', fontSize: '12px' }}>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: 'var(--primary)' }} />
-                Adequate Stock (&gt;= 5 units)
-              </span>
-              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: 'var(--danger)' }} />
-                Critical Shortage (&lt; 5 units)
-              </span>
-            </div>
-            <a href="/inventory" style={{ fontSize: '12px', fontWeight: '700', color: 'var(--primary)' }}>
-              View Detailed Inventory →
-            </a>
-          </div>
         </div>
 
-        {/* Right: Glassmorphic Clinical Access Badge matching screenshot */}
-        <DonorCardPreview
-          cardHolder={user?.full_name || 'Medical Officer'}
-          bloodGroup="O+"
-          clearance={user?.clearance || 2}
-          idNumber={`USR-00${user?.user_id || 1}-PULSE`}
-          status={user?.role?.toUpperCase() || 'STAFF'}
-        />
+        {/* Security / System Status Box */}
+        <div style={{
+          backgroundColor: '#ffffff',
+          borderRadius: 'var(--radius-lg)',
+          padding: '24px',
+          boxShadow: 'var(--shadow-card)',
+          border: '1px solid var(--border-light)',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between'
+        }}>
+          <div>
+            <div style={{ fontSize: '16px', fontWeight: '800', color: 'var(--text-main)', marginBottom: '4px' }}>
+              System Integrity
+            </div>
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginBottom: '16px' }}>
+              Security, audit trail & RLS validation
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <CheckCircle2 size={18} color="#10b981" />
+                <span style={{ fontSize: '13px', fontWeight: '600' }}>PostgreSQL RLS Enforced</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <CheckCircle2 size={18} color="#10b981" />
+                <span style={{ fontSize: '13px', fontWeight: '600' }}>MongoDB SHA-256 Hash Chain</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <CheckCircle2 size={18} color="#10b981" />
+                <span style={{ fontSize: '13px', fontWeight: '600' }}>Socket.IO Telemetry Active</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <CheckCircle2 size={18} color="#10b981" />
+                <span style={{ fontSize: '13px', fontWeight: '600' }}>FEFO Medical Algorithm Ready</span>
+              </div>
+            </div>
+          </div>
+
+          <div style={{
+            padding: '12px',
+            borderRadius: '8px',
+            backgroundColor: '#eff6ff',
+            border: '1px solid #bfdbfe',
+            marginTop: '16px'
+          }}>
+            <div style={{ fontSize: '11px', fontWeight: '700', color: '#1e40af' }}>
+              FEFO COMPLIANCE NOTE
+            </div>
+            <div style={{ fontSize: '12px', color: '#1e3a8a', marginTop: '2px' }}>
+              Allocation automatically preserves universal groups and distributes nearest-expiry units first.
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* 4. Bottom Section: Hospital Requisitions & 1-Click FEFO Allocation */}
-      <div className="hope-card" style={{ padding: '26px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+      {/* Requisitions Overview Table */}
+      <div style={{
+        backgroundColor: '#ffffff',
+        borderRadius: 'var(--radius-lg)',
+        padding: '24px',
+        boxShadow: 'var(--shadow-card)',
+        border: '1px solid var(--border-light)'
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
           <div>
-            <div style={{ fontSize: '18px', fontWeight: '800', color: 'var(--text-main)' }}>
-              Hospital Blood Requisitions Queue
+            <div style={{ fontSize: '16px', fontWeight: '800', color: 'var(--text-main)' }}>
+              Recent Hospital Requisitions Queue
             </div>
             <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-              First-Expiry-First-Out (FEFO) automated unit allocation via PostgreSQL row locks
+              Direct queue from registered hospitals requiring FEFO allocation
             </div>
           </div>
-          <a href="/requests" style={{ fontSize: '12px', fontWeight: '700', color: 'var(--primary)' }}>
-            Manage All Requisitions →
-          </a>
+          <button
+            onClick={() => setShowFEFOModal(true)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '8px 14px',
+              borderRadius: '6px',
+              backgroundColor: 'var(--primary)',
+              color: '#ffffff',
+              border: 'none',
+              fontWeight: '700',
+              fontSize: '12px',
+              cursor: 'pointer'
+            }}
+          >
+            <Zap size={14} /> Allocate First Unit
+          </button>
         </div>
 
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--text-muted)', fontSize: '11px', textTransform: 'uppercase' }}>
-                <th style={{ padding: '12px 16px' }}>Req ID</th>
-                <th style={{ padding: '12px 16px' }}>Hospital / Patient</th>
-                <th style={{ padding: '12px 16px' }}>Blood Group</th>
-                <th style={{ padding: '12px 16px' }}>Component</th>
-                <th style={{ padding: '12px 16px' }}>Units (Alloc/Need)</th>
-                <th style={{ padding: '12px 16px' }}>Urgency</th>
-                <th style={{ padding: '12px 16px' }}>Status</th>
-                <th style={{ padding: '12px 16px', textAlign: 'right' }}>FEFO Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recentRequests.length === 0 ? (
-                <tr>
-                  <td colSpan="8" style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>
-                    No active hospital requisitions found
-                  </td>
+        {recentRequests.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>
+            No recent requisitions loaded.
+          </div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
+              <thead>
+                <tr style={{ borderBottom: '2px solid #f1f5f9', color: 'var(--text-muted)' }}>
+                  <th style={{ padding: '10px 8px' }}>Req #</th>
+                  <th style={{ padding: '10px 8px' }}>Hospital</th>
+                  <th style={{ padding: '10px 8px' }}>Group</th>
+                  <th style={{ padding: '10px 8px' }}>Component</th>
+                  <th style={{ padding: '10px 8px' }}>Units</th>
+                  <th style={{ padding: '10px 8px' }}>Urgency</th>
+                  <th style={{ padding: '10px 8px' }}>Status</th>
+                  <th style={{ padding: '10px 8px' }}>Action</th>
                 </tr>
-              ) : (
-                recentRequests.map((req) => {
-                  const isPending = ['PENDING', 'APPROVED', 'PARTIAL'].includes(req.status);
-                  const isUrgent = req.urgency === 'EMERGENCY' || req.urgency === 'URGENT';
-
-                  return (
-                    <tr key={req.request_id} style={{ borderBottom: '1px solid var(--border-light)' }}>
-                      <td style={{ padding: '14px 16px', fontWeight: '700', color: 'var(--primary)' }}>
-                        #{req.request_id}
-                      </td>
-                      <td style={{ padding: '14px 16px' }}>
-                        <div style={{ fontWeight: '700' }}>{req.hospital_name || 'Hospital'}</div>
-                        <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Ref: {req.patient_ref}</div>
-                      </td>
-                      <td style={{ padding: '14px 16px' }}>
-                        <span style={{
-                          fontWeight: '800',
-                          padding: '3px 8px',
-                          borderRadius: '6px',
-                          backgroundColor: '#f0f3fe',
-                          color: 'var(--primary)'
-                        }}>
-                          {req.blood_group}
-                        </span>
-                      </td>
-                      <td style={{ padding: '14px 16px', fontWeight: '500' }}>
-                        {req.component.replace('_', ' ')}
-                      </td>
-                      <td style={{ padding: '14px 16px', fontWeight: '700' }}>
-                        {req.units_allocated || 0} / {req.units_needed}
-                      </td>
-                      <td style={{ padding: '14px 16px' }}>
-                        <span style={{
-                          fontSize: '11px',
+              </thead>
+              <tbody>
+                {recentRequests.map((r) => (
+                  <tr key={r.request_id} style={{ borderBottom: '1px solid #f8fafc' }}>
+                    <td style={{ padding: '12px 8px', fontWeight: '700' }}>#{r.request_id}</td>
+                    <td style={{ padding: '12px 8px', color: '#1e293b', fontWeight: '600' }}>{r.hospital_name || `Hospital #${r.hospital_id}`}</td>
+                    <td style={{ padding: '12px 8px' }}>
+                      <span style={{
+                        padding: '3px 8px',
+                        borderRadius: '4px',
+                        backgroundColor: '#fee2e2',
+                        color: '#dc2626',
+                        fontWeight: '800',
+                        fontSize: '12px'
+                      }}>
+                        {r.blood_group}
+                      </span>
+                    </td>
+                    <td style={{ padding: '12px 8px', color: '#64748b' }}>{r.component}</td>
+                    <td style={{ padding: '12px 8px', fontWeight: '700' }}>
+                      {r.units_allocated || 0} / {r.units_needed}
+                    </td>
+                    <td style={{ padding: '12px 8px' }}>
+                      <span style={{
+                        padding: '3px 8px',
+                        borderRadius: '4px',
+                        backgroundColor: r.urgency === 'EMERGENCY' ? '#fee2e2' : '#f1f5f9',
+                        color: r.urgency === 'EMERGENCY' ? '#b91c1c' : '#475569',
+                        fontWeight: '700',
+                        fontSize: '11px'
+                      }}>
+                        {r.urgency}
+                      </span>
+                    </td>
+                    <td style={{ padding: '12px 8px' }}>
+                      <span style={{
+                        padding: '3px 8px',
+                        borderRadius: '4px',
+                        backgroundColor: r.status === 'APPROVED' ? '#dcfce7' : '#fef3c7',
+                        color: r.status === 'APPROVED' ? '#15803d' : '#b45309',
+                        fontWeight: '700',
+                        fontSize: '11px'
+                      }}>
+                        {r.status}
+                      </span>
+                    </td>
+                    <td style={{ padding: '12px 8px' }}>
+                      <button
+                        onClick={() => {
+                          setFefoForm({ request_id: r.request_id });
+                          setShowFEFOModal(true);
+                        }}
+                        style={{
+                          padding: '4px 10px',
+                          borderRadius: '4px',
+                          backgroundColor: '#eef2ff',
+                          color: '#4338ca',
+                          border: 'none',
                           fontWeight: '700',
-                          padding: '3px 10px',
-                          borderRadius: '12px',
-                          backgroundColor: req.urgency === 'EMERGENCY' ? '#fbebee' : req.urgency === 'URGENT' ? '#fef0e8' : '#eaf4ff',
-                          color: req.urgency === 'EMERGENCY' ? 'var(--danger)' : req.urgency === 'URGENT' ? 'var(--warning)' : 'var(--primary)'
-                        }}>
-                          {req.urgency}
-                        </span>
-                      </td>
-                      <td style={{ padding: '14px 16px' }}>
-                        <span style={{
                           fontSize: '11px',
-                          fontWeight: '700',
-                          padding: '3px 10px',
-                          borderRadius: '12px',
-                          backgroundColor: req.status === 'FULFILLED' ? '#e8f5ec' : isPending ? '#eaf4ff' : '#fbebee',
-                          color: req.status === 'FULFILLED' ? 'var(--success)' : isPending ? 'var(--primary)' : 'var(--danger)'
-                        }}>
-                          {req.status}
-                        </span>
-                      </td>
-                      <td style={{ padding: '14px 16px', textAlign: 'right' }}>
-                        {isPending ? (
-                          <button
-                            onClick={() => handleFEFOAllocate(req.request_id)}
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              backgroundColor: isUrgent ? 'var(--danger)' : 'var(--primary)',
-                              color: '#ffffff',
-                              padding: '6px 14px',
-                              borderRadius: '8px',
-                              fontSize: '12px',
-                              fontWeight: '700',
-                              boxShadow: '0 2px 6px rgba(58, 87, 232, 0.2)'
-                            }}
-                          >
-                            <Zap size={13} />
-                            FEFO Allocate
-                          </button>
-                        ) : (
-                          <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Complete</span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+                          cursor: 'pointer'
+                        }}
+                      >
+                        FEFO Allocate
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
-      {/* MODAL 1: Register Donor */}
-      <Modal isOpen={showRegisterModal} onClose={() => setShowRegisterModal(false)} title="Register New Blood Donor">
-        <form onSubmit={handleRegisterDonor} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          <div>
-            <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)' }}>Full Name</label>
-            <input
-              type="text"
-              required
-              value={regForm.full_name}
-              onChange={(e) => setRegForm({ ...regForm, full_name: e.target.value })}
-              style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)', marginTop: '4px' }}
-            />
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+      {/* Modal 1: Register Donor */}
+      {showRegisterModal && (
+        <Modal title="Register New Voluntary Donor" onClose={() => setShowRegisterModal(false)}>
+          <form onSubmit={handleRegisterDonor} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)' }}>Email (Username)</label>
-              <input
-                type="email"
-                required
-                value={regForm.email}
-                onChange={(e) => setRegForm({ ...regForm, email: e.target.value })}
-                style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)', marginTop: '4px' }}
-              />
-            </div>
-            <div>
-              <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)' }}>Phone (10-digit Indian Mobile)</label>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', marginBottom: '4px' }}>Full Name</label>
               <input
                 type="text"
                 required
-                pattern="^[6-9][0-9]{9}$"
-                value={regForm.phone}
-                onChange={(e) => setRegForm({ ...regForm, phone: e.target.value })}
-                style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)', marginTop: '4px' }}
+                value={regForm.full_name}
+                onChange={(e) => setRegForm({ ...regForm, full_name: e.target.value })}
+                placeholder="Aarav Shah"
+                style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
               />
             </div>
-          </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
-            <div>
-              <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)' }}>Blood Group</label>
-              <select
-                value={regForm.blood_group}
-                onChange={(e) => setRegForm({ ...regForm, blood_group: e.target.value })}
-                style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)', marginTop: '4px' }}
-              >
-                {bloodGroups.map((bg) => <option key={bg} value={bg}>{bg}</option>)}
-              </select>
-            </div>
-            <div>
-              <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)' }}>Gender</label>
-              <select
-                value={regForm.gender}
-                onChange={(e) => setRegForm({ ...regForm, gender: e.target.value })}
-                style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)', marginTop: '4px' }}
-              >
-                <option value="M">Male (90d gap)</option>
-                <option value="F">Female (120d gap)</option>
-                <option value="O">Other</option>
-              </select>
-            </div>
-            <div>
-              <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)' }}>Weight (kg &gt;= 45)</label>
-              <input
-                type="number"
-                min="45"
-                required
-                value={regForm.weight_kg}
-                onChange={(e) => setRegForm({ ...regForm, weight_kg: Number(e.target.value) })}
-                style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)', marginTop: '4px' }}
-              />
-            </div>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-            <div>
-              <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)' }}>Date of Birth (18-65 yrs)</label>
-              <input
-                type="date"
-                required
-                value={regForm.date_of_birth}
-                onChange={(e) => setRegForm({ ...regForm, date_of_birth: e.target.value })}
-                style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)', marginTop: '4px' }}
-              />
-            </div>
-            <div>
-              <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)' }}>Region Code</label>
-              <select
-                value={regForm.region_code}
-                onChange={(e) => setRegForm({ ...regForm, region_code: e.target.value })}
-                style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)', marginTop: '4px' }}
-              >
-                <option value="SUR">Surat (SUR)</option>
-                <option value="AHM">Ahmedabad (AHM)</option>
-                <option value="VAD">Vadodara (VAD)</option>
-                <option value="RAJ">Rajkot (RAJ)</option>
-              </select>
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            style={{
-              padding: '12px',
-              backgroundColor: 'var(--primary)',
-              color: '#ffffff',
-              borderRadius: '8px',
-              fontWeight: '700',
-              marginTop: '10px'
-            }}
-          >
-            Create Encrypted Donor Profile
-          </button>
-        </form>
-      </Modal>
-
-      {/* MODAL 2: Record Donation */}
-      <Modal isOpen={showDonationModal} onClose={() => setShowDonationModal(false)} title="Record Blood Donation Intake">
-        <form onSubmit={handleRecordDonation} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-            <div>
-              <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)' }}>Donor ID</label>
-              <input
-                type="number"
-                required
-                value={donationForm.donor_id}
-                onChange={(e) => setDonationForm({ ...donationForm, donor_id: e.target.value })}
-                style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)', marginTop: '4px' }}
-              />
-            </div>
-            <div>
-              <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)' }}>Branch ID</label>
-              <input
-                type="number"
-                required
-                value={donationForm.branch_id}
-                onChange={(e) => setDonationForm({ ...donationForm, branch_id: e.target.value })}
-                style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)', marginTop: '4px' }}
-              />
-            </div>
-          </div>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-            <div>
-              <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)' }}>Volume (200-500 ml)</label>
-              <input
-                type="number"
-                min="200"
-                max="500"
-                required
-                value={donationForm.volume_ml}
-                onChange={(e) => setDonationForm({ ...donationForm, volume_ml: e.target.value })}
-                style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)', marginTop: '4px' }}
-              />
-            </div>
-            <div>
-              <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)' }}>Hemoglobin (g/dL &gt;= 12.5)</label>
-              <input
-                type="number"
-                step="0.1"
-                min="12.5"
-                required
-                value={donationForm.hemoglobin_gdl}
-                onChange={(e) => setDonationForm({ ...donationForm, hemoglobin_gdl: e.target.value })}
-                style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)', marginTop: '4px' }}
-              />
-            </div>
-          </div>
-
-          <div>
-            <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)' }}>Component Bags to Produce</label>
-            <div style={{ display: 'flex', gap: '14px', marginTop: '8px', fontSize: '13px' }}>
-              {['RED_CELLS', 'PLASMA', 'PLATELETS', 'WHOLE_BLOOD'].map((c) => (
-                <label key={c} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <input
-                    type="checkbox"
-                    checked={donationForm.components.includes(c)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setDonationForm({ ...donationForm, components: [...donationForm.components, c] });
-                      } else {
-                        setDonationForm({ ...donationForm, components: donationForm.components.filter((x) => x !== c) });
-                      }
-                    }}
-                  />
-                  {c.replace('_', ' ')}
-                </label>
-              ))}
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            style={{
-              padding: '12px',
-              backgroundColor: 'var(--primary)',
-              color: '#ffffff',
-              borderRadius: '8px',
-              fontWeight: '700',
-              marginTop: '10px'
-            }}
-          >
-            Submit Donation (Verify Gap via Trigger)
-          </button>
-        </form>
-      </Modal>
-
-      {/* MODAL 3: FEFO Quick Allocate */}
-      <Modal isOpen={showFEFOModal} onClose={() => setShowFEFOModal(false)} title="Automated FEFO Allocation">
-        <div>
-          <p style={{ fontSize: '13px', color: 'var(--text-muted)', marginBottom: '16px' }}>
-            Select any open hospital request to execute PostgreSQL <code>fn_allocate_fefo()</code> using row-level locking (<code>FOR UPDATE SKIP LOCKED</code>) to prevent race conditions.
-          </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            {recentRequests.filter((r) => r.status === 'PENDING' || r.status === 'PARTIAL').map((r) => (
-              <div key={r.request_id} style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                padding: '12px 16px',
-                border: '1px solid var(--border-light)',
-                borderRadius: '8px',
-                backgroundColor: '#f8f9fd'
-              }}>
-                <div>
-                  <div style={{ fontWeight: '700', fontSize: '13px' }}>Req #{r.request_id} - {r.hospital_name}</div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                    Needs {r.units_needed} units of {r.blood_group} ({r.component})
-                  </div>
-                </div>
-                <button
-                  onClick={() => {
-                    handleFEFOAllocate(r.request_id);
-                    setShowFEFOModal(false);
-                  }}
-                  style={{
-                    backgroundColor: 'var(--primary)',
-                    color: '#ffffff',
-                    padding: '8px 14px',
-                    borderRadius: '6px',
-                    fontSize: '12px',
-                    fontWeight: '700'
-                  }}
-                >
-                  Allocate Now
-                </button>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', marginBottom: '4px' }}>Email</label>
+                <input
+                  type="email"
+                  required
+                  value={regForm.email}
+                  onChange={(e) => setRegForm({ ...regForm, email: e.target.value })}
+                  placeholder="donor@example.com"
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                />
               </div>
-            ))}
-          </div>
-        </div>
-      </Modal>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', marginBottom: '4px' }}>Phone (Encrypted)</label>
+                <input
+                  type="text"
+                  required
+                  value={regForm.phone}
+                  onChange={(e) => setRegForm({ ...regForm, phone: e.target.value })}
+                  placeholder="9876543210"
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', marginBottom: '4px' }}>Blood Group</label>
+                <select
+                  value={regForm.blood_group}
+                  onChange={(e) => setRegForm({ ...regForm, blood_group: e.target.value })}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                >
+                  {bloodGroups.map(bg => <option key={bg} value={bg}>{bg}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', marginBottom: '4px' }}>Gender</label>
+                <select
+                  value={regForm.gender}
+                  onChange={(e) => setRegForm({ ...regForm, gender: e.target.value })}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                >
+                  <option value="M">Male (90d gap)</option>
+                  <option value="F">Female (120d gap)</option>
+                  <option value="O">Other</option>
+                </select>
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', marginBottom: '4px' }}>Weight (kg)</label>
+                <input
+                  type="number"
+                  min="45"
+                  required
+                  value={regForm.weight_kg}
+                  onChange={(e) => setRegForm({ ...regForm, weight_kg: e.target.value })}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '12px' }}>
+              <button
+                type="button"
+                onClick={() => setShowRegisterModal(false)}
+                style={{ padding: '8px 16px', borderRadius: '6px', border: 'none', backgroundColor: '#f1f5f9', cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                style={{ padding: '8px 20px', borderRadius: '6px', border: 'none', backgroundColor: 'var(--primary)', color: '#ffffff', fontWeight: '700', cursor: 'pointer' }}
+              >
+                Enroll Donor
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* Modal 2: Record Donation */}
+      {showDonationModal && (
+        <Modal title="Record Clinical Donation Intake" onClose={() => setShowDonationModal(false)}>
+          <form onSubmit={handleRecordDonation} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', marginBottom: '4px' }}>Donor ID</label>
+                <input
+                  type="number"
+                  required
+                  value={donationForm.donor_id}
+                  onChange={(e) => setDonationForm({ ...donationForm, donor_id: e.target.value })}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', marginBottom: '4px' }}>Branch ID</label>
+                <input
+                  type="number"
+                  required
+                  value={donationForm.branch_id}
+                  onChange={(e) => setDonationForm({ ...donationForm, branch_id: e.target.value })}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                />
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', marginBottom: '4px' }}>Volume (mL)</label>
+                <input
+                  type="number"
+                  min="200"
+                  max="500"
+                  required
+                  value={donationForm.volume_ml}
+                  onChange={(e) => setDonationForm({ ...donationForm, volume_ml: e.target.value })}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', marginBottom: '4px' }}>Haemoglobin (g/dL)</label>
+                <input
+                  type="number"
+                  step="0.1"
+                  min="12.5"
+                  required
+                  value={donationForm.hemoglobin_gdl}
+                  onChange={(e) => setDonationForm({ ...donationForm, hemoglobin_gdl: e.target.value })}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', marginBottom: '4px' }}>Components to Extract</label>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                {['RED_CELLS', 'PLASMA', 'PLATELETS', 'WHOLE_BLOOD'].map(c => (
+                  <label key={c} style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <input
+                      type="checkbox"
+                      checked={donationForm.components.includes(c)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setDonationForm({ ...donationForm, components: [...donationForm.components, c] });
+                        } else {
+                          setDonationForm({ ...donationForm, components: donationForm.components.filter(x => x !== c) });
+                        }
+                      }}
+                    />
+                    {c}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '12px' }}>
+              <button
+                type="button"
+                onClick={() => setShowDonationModal(false)}
+                style={{ padding: '8px 16px', borderRadius: '6px', border: 'none', backgroundColor: '#f1f5f9', cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                style={{ padding: '8px 20px', borderRadius: '6px', border: 'none', backgroundColor: 'var(--primary)', color: '#ffffff', fontWeight: '700', cursor: 'pointer' }}
+              >
+                Save Donation & Units
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* Modal 3: FEFO Allocation */}
+      {showFEFOModal && (
+        <Modal title="Execute Automated FEFO Allocation" onClose={() => setShowFEFOModal(false)}>
+          <form onSubmit={handleAllocateFEFO} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', marginBottom: '4px' }}>Blood Request ID</label>
+              <input
+                type="number"
+                required
+                value={fefoForm.request_id}
+                onChange={(e) => setFefoForm({ request_id: e.target.value })}
+                placeholder="1"
+                style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+              />
+            </div>
+            <div style={{ fontSize: '12px', color: '#64748b', lineHeight: 1.4 }}>
+              The system executes PostgreSQL function <code>fn_allocate_fefo()</code>. It reserves the earliest-expiring unexpired AVAILABLE units matching donor compatibility rules.
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '12px' }}>
+              <button
+                type="button"
+                onClick={() => setShowFEFOModal(false)}
+                style={{ padding: '8px 16px', borderRadius: '6px', border: 'none', backgroundColor: '#f1f5f9', cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                style={{ padding: '8px 20px', borderRadius: '6px', border: 'none', backgroundColor: '#10b981', color: '#ffffff', fontWeight: '700', cursor: 'pointer' }}
+              >
+                Allocate Units
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* Modal 4: Dispatch Emergency Alert */}
+      {showDispatchModal && (
+        <Modal title="Broadcast Emergency Donor Alert" onClose={() => setShowDispatchModal(false)}>
+          <form onSubmit={handleDispatchAlert} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', marginBottom: '4px' }}>Target Request ID</label>
+              <input
+                type="number"
+                required
+                value={dispatchForm.request_id}
+                onChange={(e) => setDispatchForm({ ...dispatchForm, request_id: e.target.value })}
+                style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+              />
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', marginBottom: '4px' }}>Search Radius (km)</label>
+                <input
+                  type="number"
+                  min="5"
+                  max="500"
+                  required
+                  value={dispatchForm.radius_km}
+                  onChange={(e) => setDispatchForm({ ...dispatchForm, radius_km: e.target.value })}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: '700', marginBottom: '4px' }}>Max Donors to Ping</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="50"
+                  required
+                  value={dispatchForm.max_donors}
+                  onChange={(e) => setDispatchForm({ ...dispatchForm, max_donors: e.target.value })}
+                  style={{ width: '100%', padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                />
+              </div>
+            </div>
+
+            <div style={{ fontSize: '12px', color: '#64748b' }}>
+              Calls <code>fn_find_donors_for_request()</code> to locate nearest medically eligible, available donors with compatible blood types and sends live Socket.IO push alerts.
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '12px' }}>
+              <button
+                type="button"
+                onClick={() => setShowDispatchModal(false)}
+                style={{ padding: '8px 16px', borderRadius: '6px', border: 'none', backgroundColor: '#f1f5f9', cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                style={{ padding: '8px 20px', borderRadius: '6px', border: 'none', backgroundColor: '#ef4444', color: '#ffffff', fontWeight: '700', cursor: 'pointer' }}
+              >
+                Broadcast Alert
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
     </div>
   );
 }

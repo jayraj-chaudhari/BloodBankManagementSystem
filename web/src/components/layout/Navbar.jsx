@@ -1,37 +1,30 @@
 import React, { useState } from 'react';
-import { Search, Bell, Radio, User, LogOut, ChevronDown, CheckCircle2 } from 'lucide-react';
+import { Search, Bell, Radio, User, LogOut, ChevronDown, CheckCircle2, ShieldCheck, X } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useSocket } from '../../context/SocketContext';
 
-// Demo quick-login roles defined in project specification
-const DEMO_ROLES = [
-  { role: 'bb_officer', name: 'Officer Asha', email: 'officer@bb.test', clearance: 2 },
-  { role: 'admin', name: 'Admin Patel', email: 'admin@bb.test', clearance: 2 },
-  { role: 'lab_tech', name: 'Lab Tech Raman', email: 'lab@bb.test', clearance: 3 },
-  { role: 'hospital_user', name: 'City Hospital', email: 'hospital@bb.test', clearance: 1 },
-  { role: 'donor', name: 'Donor Rajesh', email: 'donor1@bb.test', clearance: 1 },
-  { role: 'auditor', name: 'Auditor Mehta', email: 'auditor@bb.test', clearance: 2 }
-];
-
 export default function Navbar({ onSearch }) {
-  const { user, login, logout } = useAuth();
+  const { user, logout } = useAuth();
   const { isConnected, liveAlerts, clearAlerts } = useSocket();
-  const [showRoleMenu, setShowRoleMenu] = useState(false);
   const [showAlertMenu, setShowAlertMenu] = useState(false);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [searchValue, setSearchValue] = useState('');
-
-  const handleQuickSwitch = async (demo) => {
-    try {
-      await login(demo.email, 'Test@1234');
-      setShowRoleMenu(false);
-    } catch (e) {
-      console.error('Quick switch failed:', e);
-    }
-  };
 
   const handleSearchChange = (e) => {
     setSearchValue(e.target.value);
     if (onSearch) onSearch(e.target.value);
+  };
+
+  const getRoleDisplayName = (r) => {
+    switch (r) {
+      case 'admin': return 'System Administrator';
+      case 'bb_officer': return 'Blood Bank Officer';
+      case 'lab_tech': return 'Laboratory Specialist';
+      case 'hospital_user': return 'Hospital Requisition Desk';
+      case 'donor': return 'Registered Blood Donor';
+      case 'auditor': return 'Independent Auditor';
+      default: return r || 'Authenticated User';
+    }
   };
 
   return (
@@ -47,250 +40,294 @@ export default function Navbar({ onSearch }) {
       top: 0,
       zIndex: 90
     }}>
-      {/* Search Input matching Hope UI search box */}
+      {/* Search Input */}
       <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '10px',
-        backgroundColor: '#f5f6fa',
-        borderRadius: 'var(--radius-md)',
-        padding: '10px 16px',
-        width: '320px',
-        border: '1px solid var(--border)'
+        position: 'relative',
+        width: '380px'
       }}>
-        <Search size={18} color="var(--text-muted)" />
+        <Search
+          size={18}
+          color="var(--text-muted)"
+          style={{
+            position: 'absolute',
+            left: '14px',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            pointerEvents: 'none'
+          }}
+        />
         <input
           type="text"
-          placeholder="Search blood bags, donors, requests..."
           value={searchValue}
           onChange={handleSearchChange}
+          placeholder="Search donors, bags, tests, requisitions..."
           style={{
-            border: 'none',
-            background: 'transparent',
             width: '100%',
+            padding: '10px 16px 10px 42px',
+            borderRadius: 'var(--radius-md)',
+            border: '1px solid var(--border-light)',
+            backgroundColor: '#f8f9fd',
             fontSize: '13px',
-            color: 'var(--text-main)'
+            color: 'var(--text-main)',
+            outline: 'none',
+            transition: 'border-color 0.2s ease, background-color 0.2s ease'
+          }}
+          onFocus={(e) => {
+            e.target.style.borderColor = 'var(--primary)';
+            e.target.style.backgroundColor = '#ffffff';
+          }}
+          onBlur={(e) => {
+            e.target.style.borderColor = 'var(--border-light)';
+            e.target.style.backgroundColor = '#f8f9fd';
           }}
         />
       </div>
 
-      {/* Right Navbar Controls */}
+      {/* Right Controls */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-        {/* Real-time Socket.IO Live Status Indicator */}
+        {/* Real-Time Socket Connection Pill */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
           gap: '8px',
           padding: '6px 14px',
           borderRadius: '20px',
-          backgroundColor: isConnected ? '#e8f5ec' : '#fbebee',
-          color: isConnected ? 'var(--success)' : 'var(--danger)',
+          backgroundColor: isConnected ? '#e6f7f0' : '#fee2e2',
+          border: `1px solid ${isConnected ? '#10b981' : '#ef4444'}`,
           fontSize: '12px',
-          fontWeight: '700'
+          fontWeight: '600',
+          color: isConnected ? '#059669' : '#b91c1c'
         }}>
-          <span className="pulse-dot" style={{ backgroundColor: isConnected ? 'var(--success)' : 'var(--danger)' }} />
-          <span>{isConnected ? 'Real-Time Live' : 'Disconnected'}</span>
+          <span style={{
+            width: '8px',
+            height: '8px',
+            borderRadius: '50%',
+            backgroundColor: isConnected ? '#10b981' : '#ef4444',
+            display: 'inline-block',
+            boxShadow: isConnected ? '0 0 8px rgba(16, 185, 129, 0.8)' : 'none'
+          }} />
+          {isConnected ? 'PulseNet Live' : 'Reconnecting...'}
         </div>
 
-        {/* Emergency Alerts Bell Dropdown */}
+        {/* Live Notification Bell with Dropdown */}
         <div style={{ position: 'relative' }}>
           <button
             onClick={() => setShowAlertMenu(!showAlertMenu)}
             style={{
+              position: 'relative',
               width: '40px',
               height: '40px',
-              borderRadius: '10px',
-              backgroundColor: '#f5f6fa',
+              borderRadius: '50%',
+              backgroundColor: showAlertMenu ? 'var(--primary-light)' : '#f8f9fd',
+              border: '1px solid var(--border-light)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              color: 'var(--text-main)',
-              position: 'relative'
+              color: showAlertMenu ? 'var(--primary)' : 'var(--text-muted)',
+              cursor: 'pointer'
             }}
           >
             <Bell size={18} />
             {liveAlerts.length > 0 && (
               <span style={{
                 position: 'absolute',
-                top: '6px',
-                right: '6px',
-                width: '8px',
-                height: '8px',
-                borderRadius: '50%',
-                backgroundColor: 'var(--danger)'
-              }} />
+                top: '-2px',
+                right: '-2px',
+                minWidth: '18px',
+                height: '18px',
+                borderRadius: '9px',
+                backgroundColor: 'var(--danger)',
+                color: '#ffffff',
+                fontSize: '10px',
+                fontWeight: '800',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '0 4px',
+                border: '2px solid #ffffff'
+              }}>
+                {liveAlerts.length}
+              </span>
             )}
           </button>
 
           {showAlertMenu && (
-            <div className="hope-card" style={{
+            <div style={{
               position: 'absolute',
-              top: '50px',
               right: 0,
-              width: '320px',
+              top: '52px',
+              width: '360px',
               backgroundColor: '#ffffff',
-              borderRadius: 'var(--radius-md)',
-              boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
+              borderRadius: 'var(--radius-lg)',
+              boxShadow: '0 12px 30px rgba(0, 0, 0, 0.15)',
+              border: '1px solid var(--border-light)',
               padding: '16px',
-              zIndex: 100
+              zIndex: 200
             }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                <span style={{ fontSize: '13px', fontWeight: '700' }}>Emergency Alerts ({liveAlerts.length})</span>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: '12px',
+                paddingBottom: '8px',
+                borderBottom: '1px solid var(--border-light)'
+              }}>
+                <div style={{ fontSize: '14px', fontWeight: '800', color: 'var(--text-main)' }}>
+                  Live Dispatch Feed
+                </div>
                 {liveAlerts.length > 0 && (
-                  <button onClick={clearAlerts} style={{ fontSize: '11px', color: 'var(--primary)', background: 'none', fontWeight: '600' }}>
-                    Clear all
+                  <button
+                    onClick={clearAlerts}
+                    style={{
+                      fontSize: '11px',
+                      color: 'var(--primary)',
+                      fontWeight: '700',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Clear All
                   </button>
                 )}
               </div>
-              <div style={{ maxHeight: '240px', overflowY: 'auto' }}>
-                {liveAlerts.length === 0 ? (
-                  <div style={{ fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center', padding: '16px 0' }}>
-                    No active emergency alerts
-                  </div>
-                ) : (
-                  liveAlerts.map((alt, idx) => (
-                    <div key={idx} style={{
-                      padding: '10px',
-                      borderRadius: '8px',
-                      backgroundColor: '#fbebee',
-                      marginBottom: '8px',
-                      borderLeft: '3px solid var(--danger)'
-                    }}>
-                      <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--danger)' }}>
-                        URGENT: {alt.blood_group} ({alt.component})
+
+              {liveAlerts.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '24px 8px', color: 'var(--text-muted)', fontSize: '13px' }}>
+                  <ShieldCheck size={32} color="#10b981" style={{ margin: '0 auto 8px auto', display: 'block' }} />
+                  All emergency dispatches are normal. Socket telemetry active.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', maxHeight: '300px', overflowY: 'auto' }}>
+                  {liveAlerts.map((al, idx) => (
+                    <div
+                      key={idx}
+                      style={{
+                        padding: '10px 12px',
+                        backgroundColor: '#fff7ed',
+                        borderLeft: '3px solid #f97316',
+                        borderRadius: '6px'
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '12px', fontWeight: '800', color: '#c2410c' }}>
+                          CRITICAL DEMAND
+                        </span>
+                        <span style={{ fontSize: '10px', color: '#9a3412', fontWeight: '600' }}>
+                          {al.distance_km ? `${al.distance_km} km` : 'Active'}
+                        </span>
                       </div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-main)' }}>
-                        {alt.hospital_name || 'Emergency Requisition'}
+                      <div style={{ fontSize: '12px', fontWeight: '600', color: '#1e293b', marginTop: '2px' }}>
+                        Group {al.blood_group} ({al.component || 'Whole Blood'})
+                      </div>
+                      <div style={{ fontSize: '11px', color: '#64748b' }}>
+                        {al.hospital_name || 'Emergency Unit'}
                       </div>
                     </div>
-                  ))
-                )}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
 
-        {/* Demo Role Switcher Quick Pill */}
+        {/* User Account & Logout Control */}
         <div style={{ position: 'relative' }}>
           <button
-            onClick={() => setShowRoleMenu(!showRoleMenu)}
+            onClick={() => setShowProfileMenu(!showProfileMenu)}
             style={{
               display: 'flex',
               alignItems: 'center',
-              gap: '6px',
-              padding: '8px 12px',
-              borderRadius: 'var(--radius-md)',
-              backgroundColor: 'var(--primary-light)',
-              color: 'var(--primary)',
-              fontSize: '12px',
-              fontWeight: '700'
+              gap: '12px',
+              padding: '6px 12px 6px 8px',
+              backgroundColor: '#f8f9fd',
+              borderRadius: '24px',
+              border: '1px solid var(--border-light)',
+              cursor: 'pointer'
             }}
           >
-            <span>Role Switcher</span>
-            <ChevronDown size={14} />
-          </button>
-
-          {showRoleMenu && (
-            <div className="hope-card" style={{
-              position: 'absolute',
-              top: '46px',
-              right: 0,
-              width: '240px',
-              backgroundColor: '#ffffff',
-              borderRadius: 'var(--radius-md)',
-              boxShadow: '0 10px 30px rgba(0,0,0,0.12)',
-              padding: '8px',
-              zIndex: 100
-            }}>
-              <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', padding: '6px 10px' }}>
-                SWITCH ACTIVE ROLE (DEMO)
-              </div>
-              {DEMO_ROLES.map((demo, idx) => (
-                <div
-                  key={idx}
-                  onClick={() => handleQuickSwitch(demo)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '8px 10px',
-                    borderRadius: '6px',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                    fontWeight: user?.role === demo.role ? '700' : '500',
-                    backgroundColor: user?.role === demo.role ? 'var(--primary-light)' : 'transparent',
-                    color: user?.role === demo.role ? 'var(--primary)' : 'var(--text-main)'
-                  }}
-                >
-                  <div>
-                    <div>{demo.name}</div>
-                    <div style={{ fontSize: '10px', color: 'var(--text-muted)' }}>{demo.role} • L{demo.clearance}</div>
-                  </div>
-                  {user?.role === demo.role && <CheckCircle2 size={16} color="var(--primary)" />}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* User Profile matching Hope UI screenshot avatar */}
-        {user ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{
-              width: '40px',
-              height: '40px',
+              width: '36px',
+              height: '36px',
               borderRadius: '50%',
-              backgroundColor: '#1e3bb3',
+              background: 'linear-gradient(135deg, #1e3bb3 0%, #3a57e8 100%)',
               color: '#ffffff',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontWeight: '700',
-              fontSize: '15px'
+              fontWeight: '800',
+              fontSize: '13px'
             }}>
-              {user.full_name ? user.full_name[0].toUpperCase() : 'U'}
+              {user?.full_name ? user.full_name.substring(0, 2).toUpperCase() : 'U'}
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-main)', lineHeight: '1.2' }}>
-                {user.full_name || 'Staff User'}
-              </span>
-              <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                {user.role} (L{user.clearance})
-              </span>
+            <div style={{ textAlign: 'left' }}>
+              <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-main)', maxWidth: '140px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {user?.full_name || 'User'}
+              </div>
+              <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--primary)' }}>
+                {getRoleDisplayName(user?.role)}
+              </div>
             </div>
 
-            <button
-              onClick={logout}
-              title="Logout"
-              style={{
-                background: 'transparent',
-                color: 'var(--text-muted)',
-                padding: '6px',
-                borderRadius: '8px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-            >
-              <LogOut size={16} />
-            </button>
-          </div>
-        ) : (
-          <a
-            href="/login"
-            style={{
-              padding: '8px 16px',
-              borderRadius: '8px',
-              backgroundColor: 'var(--primary)',
-              color: '#ffffff',
-              fontSize: '13px',
-              fontWeight: '700'
-            }}
-          >
-            Sign In
-          </a>
-        )}
+            <ChevronDown size={14} color="var(--text-muted)" />
+          </button>
+
+          {showProfileMenu && (
+            <div style={{
+              position: 'absolute',
+              right: 0,
+              top: '54px',
+              width: '260px',
+              backgroundColor: '#ffffff',
+              borderRadius: 'var(--radius-md)',
+              boxShadow: '0 12px 30px rgba(0, 0, 0, 0.15)',
+              border: '1px solid var(--border-light)',
+              padding: '8px',
+              zIndex: 200
+            }}>
+              <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--border-light)', marginBottom: '6px' }}>
+                <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '600' }}>Signed in as</div>
+                <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {user?.email || user?.full_name}
+                </div>
+                <div style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
+                  <span style={{ fontSize: '10px', padding: '2px 6px', borderRadius: '4px', backgroundColor: '#eef2ff', color: '#4338ca', fontWeight: '700' }}>
+                    {user?.role}
+                  </span>
+                  <span style={{ fontSize: '10px', padding: '2px 6px', borderRadius: '4px', backgroundColor: '#ecfdf5', color: '#047857', fontWeight: '700' }}>
+                    RLS Level {user?.clearance}
+                  </span>
+                </div>
+              </div>
+
+              <button
+                onClick={() => {
+                  setShowProfileMenu(false);
+                  logout();
+                }}
+                style={{
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '10px',
+                  padding: '10px 12px',
+                  borderRadius: '6px',
+                  border: 'none',
+                  backgroundColor: '#fee2e2',
+                  color: '#dc2626',
+                  fontSize: '13px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.15s ease'
+                }}
+              >
+                <LogOut size={16} />
+                <span>Log Out of Session</span>
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   );

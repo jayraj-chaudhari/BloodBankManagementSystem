@@ -92,6 +92,8 @@ export const alertApi = {
   createAlerts: (requestId, radiusKm = 25, maxDonors = 10) =>
     api.post(`/requests/${requestId}/alerts`, { radius_km: radiusKm, max_donors: maxDonors }),
   getAlertsMe: () => api.get('/alerts/me'),
+  getMyAlerts: () => api.get('/alerts/me'),
+  createAlert: (requestId, data) => api.post(/requests//alerts, data),
   respondAlert: (alertId, response) => api.post(`/alerts/${alertId}/respond`, { response })
 };
 
@@ -114,3 +116,10 @@ export const masterApi = {
 };
 
 export default api;
+
+// Unit Management APIs
+export const unitApi = {
+  getUnits: (params) => api.get('/units', { params }),
+  getUnitById: (id) => api.get(/units/),
+  updateUnitStatus: (id, status, storage_location) => api.patch(/units//status, { status, storage_location })
+};

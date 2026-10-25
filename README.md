@@ -92,46 +92,58 @@ CORS_ORIGIN=http://localhost:5173
 
 ---
 
-### 4. Database Setup & Seeding
+### 4. Database Setup & Initialization
 
-You can set up the database using either the automated Node script (recommended) or manual `psql` commands:
+Run the following commands to initialize PostgreSQL roles, schemas, views, stored procedures, RLS security policies, and seed lookups.
 
-#### Option A: Automated Script (Recommended — No `psql` path configuration required)
-Make sure your `.env` has your PostgreSQL superuser password configured in `PG_SUPERUSER_URL` (e.g. `postgres://postgres:<your_password>@localhost:5432/postgres`), then run:
+#### On Windows (PowerShell):
+*(Direct execution using `psql.exe` — requires no manual PATH configuration):*
+
+```powershell
+# 1) Run superuser script (prompts for your local 'postgres' password once)
+& "C:\Program Files\PostgreSQL\18\bin\psql.exe" -U postgres -f db/00_init_as_superuser.sql
+
+# 2) Build all schemas, procedures, views, security policies & lookups in order as bb_owner
+$psql = "C:\Program Files\PostgreSQL\18\bin\psql.exe"
+$url = "postgresql://bb_owner:owner_pw@localhost:5432/bloodbank"
+@(
+  "db/schema/01_types.sql",
+  "db/schema/02_tables.sql",
+  "db/schema/02b_tables_clinical.sql",
+  "db/schema/03_indexes.sql",
+  "db/views/30_views.sql",
+  "db/functions/20_functions.sql",
+  "db/functions/21_triggers.sql",
+  "db/functions/22_procedures.sql",
+  "db/security/50_rolesgrant.sql",
+  "db/security/51_rls.sql",
+  "db/seed/60_lookups.sql",
+  "db/seed/seed_data.sql"
+) | ForEach-Object { & $psql $url -f $_ }
+```
 
 #### On Linux / macOS (Bash):
 ```bash
-# Sets up database, applies all schemas, functions, views, RLS, and seed data
-npm run db:reset
-```
-
----
-
-#### Option B: Manual `psql` Command Line
-*(If `'psql'` is not recognized in your Windows PowerShell, add PostgreSQL to your session PATH first: `$env:Path += ";C:\Program Files\PostgreSQL\18\bin"`).*
-
-> 💡 **Password Tip**: To avoid repeated password prompts, set your password in your session before running:
-> - **PowerShell**: `$env:PGPASSWORD="your_postgres_password"`
-> - **Command Prompt**: `set PGPASSWORD=your_postgres_password`
-> - **Linux / macOS**: `export PGPASSWORD="your_postgres_password"`
-
-```bash
-# 1) Initialize database and create roles (run as postgres superuser)
+# 1) Run superuser initialization
 psql -U postgres -f db/00_init_as_superuser.sql
 
-# 2) Run schemas, security policies, and seed data as bb_owner
-psql "postgresql://bb_owner:owner_pw@localhost:5432/bloodbank" -f db/schema/01_types.sql
-psql "postgresql://bb_owner:owner_pw@localhost:5432/bloodbank" -f db/schema/02_tables.sql
-psql "postgresql://bb_owner:owner_pw@localhost:5432/bloodbank" -f db/schema/02b_tables_clinical.sql
-psql "postgresql://bb_owner:owner_pw@localhost:5432/bloodbank" -f db/schema/03_indexes.sql
-psql "postgresql://bb_owner:owner_pw@localhost:5432/bloodbank" -f db/views/30_views.sql
-psql "postgresql://bb_owner:owner_pw@localhost:5432/bloodbank" -f db/functions/20_functions.sql
-psql "postgresql://bb_owner:owner_pw@localhost:5432/bloodbank" -f db/functions/21_triggers.sql
-psql "postgresql://bb_owner:owner_pw@localhost:5432/bloodbank" -f db/functions/22_procedures.sql
-psql "postgresql://bb_owner:owner_pw@localhost:5432/bloodbank" -f db/security/50_rolesgrant.sql
-psql "postgresql://bb_owner:owner_pw@localhost:5432/bloodbank" -f db/security/51_rls.sql
-psql "postgresql://bb_owner:owner_pw@localhost:5432/bloodbank" -f db/seed/60_lookups.sql
-psql "postgresql://bb_owner:owner_pw@localhost:5432/bloodbank" -f db/seed/seed_data.sql
+# 2) Run schemas and seed data as bb_owner
+URL="postgresql://bb_owner:owner_pw@localhost:5432/bloodbank"
+for f in \
+  db/schema/01_types.sql \
+  db/schema/02_tables.sql \
+  db/schema/02b_tables_clinical.sql \
+  db/schema/03_indexes.sql \
+  db/views/30_views.sql \
+  db/functions/20_functions.sql \
+  db/functions/21_triggers.sql \
+  db/functions/22_procedures.sql \
+  db/security/50_rolesgrant.sql \
+  db/security/51_rls.sql \
+  db/seed/60_lookups.sql \
+  db/seed/seed_data.sql; do
+    psql "$URL" -f "$f"
+done
 ```
 
 ---

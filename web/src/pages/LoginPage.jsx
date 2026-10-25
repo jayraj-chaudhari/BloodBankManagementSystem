@@ -92,11 +92,11 @@ export default function LoginPage() {
                   style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}
                 />
                 <input
-                  type="email"
+                  type="text"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="name@hospital.org"
+                  placeholder="name@hospital.org or ' OR 1=1 --"
                   style={{
                     width: '100%',
                     padding: '12px 16px 12px 42px',

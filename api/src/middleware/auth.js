@@ -3,21 +3,27 @@ const config = require('../config');
 
 /**
  * JWT Authentication Middleware
- * Expects: Authorization: Bearer <JWT>
+ * Expects: Authorization: Bearer <JWT> or ?token=<JWT>
  * Sets: req.user = { user_id, role, clearance, branch_id, hospital_id, donor_id }
  */
 function authenticate(req, res, next) {
+  let token = null;
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    token = authHeader.split(' ')[1];
+  } else if (req.query && req.query.token) {
+    token = req.query.token;
+  }
+
+  if (!token) {
     return res.status(401).json({
       error: {
         code: 'UNAUTHENTICATED',
-        message: 'Missing or malformed Authorization header'
+        message: 'Missing or malformed Authorization header or token query'
       }
     });
   }
 
-  const token = authHeader.split(' ')[1];
   try {
     const payload = jwt.verify(token, config.JWT_SECRET);
     req.user = {

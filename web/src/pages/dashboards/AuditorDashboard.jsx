@@ -47,19 +47,20 @@ export default function AuditorDashboard() {
       setVerifying(true);
       const res = await auditApi.verifyChain();
       setIntegrityStatus(res.data);
-      if (res.data?.valid) {
+      if (res.data?.verified || res.data?.valid) {
         toast.success(
-          `SHA-256 chain verified: ${res.data.verified_records || 0} sequential blocks intact with zero tamper detected.`,
+          `SHA-256 chain verified: ${res.data.total_entries_verified || res.data.verified_records || 0} sequential blocks intact with zero tamper detected.`,
           'Cryptographic Verification Passed'
         );
       } else {
         toast.error(
-          `Integrity anomaly detected at sequence #${res.data?.broken_at || 'unknown'}`,
+          `Integrity anomaly detected: ${res.error?.message || 'Tamper detected'}`,
           'Tamper Detected'
         );
       }
     } catch (err) {
-      toast.error(err.message || 'Chain verification failed');
+      toast.error(err.message || 'Chain verification failed: Tamper detected in block hash sequence', 'Integrity Violation');
+      setIntegrityStatus({ verified: false, error: err.message });
     } finally {
       setVerifying(false);
     }

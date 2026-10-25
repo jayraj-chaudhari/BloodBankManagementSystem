@@ -25,6 +25,7 @@ import HospitalDashboard from './dashboards/HospitalDashboard';
 import DonorDashboard from './dashboards/DonorDashboard';
 import LabTechDashboard from './dashboards/LabTechDashboard';
 import AuditorDashboard from './dashboards/AuditorDashboard';
+import AdminDashboard from './dashboards/AdminDashboard';
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -33,7 +34,10 @@ export default function DashboardPage() {
 
   const role = user?.role || user?.role_name;
 
-  // If user role is Hospital, Donor, Lab Tech, or Auditor, render their dedicated production portal
+  // Render dedicated role dashboard
+  if (role === 'admin') {
+    return <AdminDashboard />;
+  }
   if (role === 'hospital_user') {
     return <HospitalDashboard />;
   }

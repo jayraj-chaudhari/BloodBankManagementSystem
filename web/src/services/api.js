@@ -50,6 +50,7 @@ export const authApi = {
 export const inventoryApi = {
   getInventory: () => api.get('/inventory'),
   getPublicInventory: () => api.get('/inventory/public'),
+  getLedger: (params) => api.get('/inventory/ledger', { params }),
   getUnits: (params) => api.get('/units', { params }),
   updateUnitStatus: (unitId, status) => api.patch(`/units/${unitId}/status`, { status }),
   expireUnits: () => api.post('/admin/expire-units')
@@ -98,6 +99,7 @@ export const requestApi = {
 // 7. Emergency Alerts APIs
 export const alertApi = {
   getAlertsForRequest: (requestId) => api.get(`/requests/${requestId}/alerts`),
+  getCandidateDonors: (requestId, params) => api.get(`/requests/${requestId}/candidate-donors`, { params }),
   createAlerts: (requestId, radiusKm = 25, maxDonors = 10) =>
     api.post(`/requests/${requestId}/alerts`, { radius_km: radiusKm, max_donors: maxDonors }),
   getAlertsMe: () => api.get('/alerts/me'),
@@ -121,7 +123,15 @@ export const auditApi = {
 // 10. Master Data APIs
 export const masterApi = {
   getBranches: (params) => api.get('/branches', { params }),
-  getHospitals: (params) => api.get('/hospitals', { params })
+  getHospitals: (params) => api.get('/hospitals', { params }),
+  createHospital: (data) => api.post('/hospitals', data)
+};
+
+// 11. Admin APIs (Staff & System Management)
+export const adminApi = {
+  getUsers: () => api.get('/admin/users'),
+  createUser: (data) => api.post('/admin/users', data),
+  expireUnits: () => api.post('/admin/expire-units')
 };
 
 export default api;

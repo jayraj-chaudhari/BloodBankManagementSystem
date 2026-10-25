@@ -1,9 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { HeartHandshake, Plus, CheckCircle2, AlertTriangle, Calendar, Droplets } from 'lucide-react';
 import { donationApi } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import Modal from '../components/common/Modal';
 
 export default function DonationsPage() {
+  const { user } = useAuth();
+  const role = user?.role || user?.role_name;
+  const isDonor = role === 'donor';
+
   const [donations, setDonations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -22,8 +27,13 @@ export default function DonationsPage() {
   const loadDonations = async () => {
     try {
       setLoading(true);
-      const res = await donationApi.getDonations();
-      setDonations(res.data || []);
+      if (isDonor) {
+        const res = await donationApi.getDonationsMe();
+        setDonations(res.data || []);
+      } else {
+        const res = await donationApi.getDonations();
+        setDonations(res.data || []);
+      }
     } catch (err) {
       console.error('Failed to load donations:', err);
     } finally {
@@ -33,7 +43,7 @@ export default function DonationsPage() {
 
   useEffect(() => {
     loadDonations();
-  }, []);
+  }, [isDonor]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -63,30 +73,34 @@ export default function DonationsPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
         <div>
           <h2 style={{ fontSize: '24px', fontWeight: '800', color: 'var(--text-main)' }}>
-            Blood Donation Events
+            {isDonor ? 'My Life-Saving Blood Donations' : 'Blood Donation Events'}
           </h2>
           <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-            Enforces PostgreSQL gap check triggers (90 days male, 120 days female) & automatic component breakdown
+            {isDonor
+              ? 'Track your personal donation records, volume contributed, and component processing.'
+              : 'Enforces PostgreSQL gap check triggers (90 days male, 120 days female) & automatic component breakdown'}
           </p>
         </div>
 
-        <button
-          onClick={() => setShowModal(true)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            backgroundColor: 'var(--primary)',
-            color: '#ffffff',
-            padding: '10px 18px',
-            borderRadius: 'var(--radius-md)',
-            fontWeight: '700',
-            fontSize: '13px'
-          }}
-        >
-          <Plus size={16} />
-          Record Donation
-        </button>
+        {!isDonor && (
+          <button
+            onClick={() => setShowModal(true)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              backgroundColor: 'var(--primary)',
+              color: '#ffffff',
+              padding: '10px 18px',
+              borderRadius: 'var(--radius-md)',
+              fontWeight: '700',
+              fontSize: '13px'
+            }}
+          >
+            <Plus size={16} />
+            Record Donation
+          </button>
+        )}
       </div>
 
       {successMsg && (

@@ -164,6 +164,45 @@ export default function LoginPage() {
             </button>
           </form>
 
+          {/* Quick Demo Role Selector Pills */}
+          <div style={{ marginTop: '24px', borderTop: '1px solid var(--border-light)', paddingTop: '18px' }}>
+            <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: '10px' }}>
+              Quick Fill Demo Role Credentials (Password: Test@1234)
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px' }}>
+              {[
+                { label: 'Admin', email: 'admin@bb.test', color: '#3a57e8' },
+                { label: 'Officer', email: 'officer@bb.test', color: '#08b1ba' },
+                { label: 'Lab Tech', email: 'lab@bb.test', color: '#f59e0b' },
+                { label: 'Hospital', email: 'hospital@bb.test', color: '#10b981' },
+                { label: 'Donor', email: 'donor1@bb.test', color: '#ec4899' },
+                { label: 'Auditor', email: 'auditor@bb.test', color: '#8b5cf6' }
+              ].map(r => (
+                <button
+                  key={r.label}
+                  type="button"
+                  onClick={() => {
+                    setEmail(r.email);
+                    setPassword('Test@1234');
+                  }}
+                  style={{
+                    padding: '6px 8px',
+                    borderRadius: '6px',
+                    border: '1px solid var(--border)',
+                    backgroundColor: '#f8f9fd',
+                    fontSize: '11px',
+                    fontWeight: '700',
+                    color: r.color,
+                    cursor: 'pointer',
+                    textAlign: 'center'
+                  }}
+                >
+                  {r.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Security Banner */}
           <div style={{
             marginTop: '28px',

@@ -3,11 +3,20 @@ import { authApi } from '../services/api';
 
 const AuthContext = createContext(null);
 
+const normalizeUser = (u) => {
+  if (!u) return null;
+  const raw = u.data ? u.data : u;
+  return {
+    ...raw,
+    role: raw.role || raw.role_name
+  };
+};
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
     const saved = localStorage.getItem('bb_user');
     if (saved) {
-      try { return JSON.parse(saved); } catch (e) { return null; }
+      try { return normalizeUser(JSON.parse(saved)); } catch (e) { return null; }
     }
     return null;
   });
@@ -19,8 +28,9 @@ export function AuthProvider({ children }) {
       if (token) {
         try {
           const res = await authApi.getMe();
-          setUser(res.data);
-          localStorage.setItem('bb_user', JSON.stringify(res.data));
+          const cleanUser = normalizeUser(res.data || res);
+          setUser(cleanUser);
+          localStorage.setItem('bb_user', JSON.stringify(cleanUser));
         } catch (err) {
           console.error('Failed to load user session:', err);
           // If token explicitly expired (401), log out
@@ -36,12 +46,15 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password) => {
     const res = await authApi.login(email, password);
-    const { token: jwtToken, user: userData } = res.data;
+    const data = res.data || res;
+    const jwtToken = data.token;
+    const cleanUser = normalizeUser(data.user);
+
     localStorage.setItem('bb_token', jwtToken);
-    localStorage.setItem('bb_user', JSON.stringify(userData));
+    localStorage.setItem('bb_user', JSON.stringify(cleanUser));
     setToken(jwtToken);
-    setUser(userData);
-    return userData;
+    setUser(cleanUser);
+    return cleanUser;
   };
 
   const logout = () => {

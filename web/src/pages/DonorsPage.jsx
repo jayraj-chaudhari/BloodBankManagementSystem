@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Users, Eye, EyeOff, ShieldAlert, CheckCircle2, XCircle, Search, Filter } from 'lucide-react';
 import { donorApi } from '../services/api';
+import { useToast } from '../context/ToastContext';
 import Modal from '../components/common/Modal';
 
 export default function DonorsPage() {
+  const toast = useToast();
   const [donors, setDonors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [bloodGroupFilter, setBloodGroupFilter] = useState('');
@@ -42,7 +44,7 @@ export default function DonorsPage() {
       const res = await donorApi.getDonorContact(donorId);
       setSelectedContact(res.data);
     } catch (err) {
-      alert(`Contact reveal failed: ${err.message}`);
+      toast.error(`Contact reveal failed: ${err.message}`);
     } finally {
       setContactLoading(false);
     }

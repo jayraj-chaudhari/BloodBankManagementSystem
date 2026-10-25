@@ -1,10 +1,17 @@
-import React, { useState } from 'react';
-import { Microscope, CheckCircle2, XCircle, AlertCircle, Plus, ShieldCheck } from 'lucide-react';
-import { screeningApi } from '../services/api';
+import React, { useState, useEffect } from 'react';
+import { Microscope, CheckCircle2, XCircle, AlertCircle, Plus, ShieldCheck, Lock } from 'lucide-react';
+import { screeningApi, donationApi } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import Modal from '../components/common/Modal';
 
 export default function ScreeningsPage() {
+  const { user } = useAuth();
+  const role = user?.role || user?.role_name;
+  const isLabTech = role === 'lab_tech';
+  const isDonor = role === 'donor';
+
   const [donationId, setDonationId] = useState('1');
+  const [donorDonations, setDonorDonations] = useState([]);
   const [screenings, setScreenings] = useState([]);
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -17,11 +24,26 @@ export default function ScreeningsPage() {
     notes: 'Chemiluminescence assay passed'
   });
 
+  const loadDonorDonations = async () => {
+    try {
+      const res = await donationApi.getDonationsMe();
+      const list = res.data || [];
+      setDonorDonations(list);
+      if (list.length > 0) {
+        setDonationId(String(list[0].donation_id));
+        loadScreenings(list[0].donation_id);
+      }
+    } catch (err) {
+      console.error('Failed to load donor donations:', err);
+    }
+  };
+
   const loadScreenings = async (id = donationId) => {
+    if (!id) return;
     try {
       setLoading(true);
       setMessage(null);
-      const res = id ? await screeningApi.getScreenings(id) : await screeningApi.getScreenings();
+      const res = await screeningApi.getScreenings(id);
       setScreenings(res.data || []);
     } catch (err) {
       console.error('Failed to load screenings:', err);
@@ -31,9 +53,13 @@ export default function ScreeningsPage() {
     }
   };
 
-  React.useEffect(() => {
-    loadScreenings(donationId);
-  }, []);
+  useEffect(() => {
+    if (isDonor) {
+      loadDonorDonations();
+    } else if (isLabTech) {
+      loadScreenings(donationId);
+    }
+  }, [role]);
 
   const handleTestSubmit = async (e) => {
     e.preventDefault();
@@ -55,40 +81,86 @@ export default function ScreeningsPage() {
 
   const tests = ['HIV', 'HBV', 'HCV', 'SYPHILIS', 'MALARIA'];
 
+  if (!isLabTech && !isDonor) {
+    return (
+      <div style={{ maxWidth: '800px', margin: '40px auto' }}>
+        <div className="hope-card" style={{ padding: '36px', textAlign: 'center' }}>
+          <div style={{
+            width: '64px',
+            height: '64px',
+            borderRadius: '50%',
+            backgroundColor: '#fee2e2',
+            color: '#dc2626',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: '0 auto 20px'
+          }}>
+            <Lock size={32} />
+          </div>
+          <h2 style={{ fontSize: '22px', fontWeight: '800', color: 'var(--text-main)', marginBottom: '8px' }}>
+            MAC Level 3 Restricted Area
+          </h2>
+          <p style={{ fontSize: '14px', color: 'var(--text-muted)', lineHeight: '1.6', marginBottom: '20px' }}>
+            Clinical screening results and infectious disease diagnostics are strictly partitioned under PostgreSQL Mandatory Access Control (MAC Level 3: RESTRICTED).
+            Your active role (<strong>{role}</strong>, MAC Level {user?.clearance || 2}) cannot view or record infectious panel results.
+          </p>
+          <div style={{
+            padding: '16px',
+            backgroundColor: '#f8f9fd',
+            borderRadius: '8px',
+            fontSize: '13px',
+            color: 'var(--text-muted)',
+            border: '1px solid var(--border-light)',
+            display: 'inline-block',
+            textAlign: 'left'
+          }}>
+            <div><strong>Authorized Role:</strong> Laboratory Specialist (`bb_lab_tech`)</div>
+            <div><strong>Demo Account:</strong> Dr. Suresh Mehta (<code>lab@bb.test</code>)</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <h2 style={{ fontSize: '24px', fontWeight: '800', color: 'var(--text-main)' }}>
-              Laboratory Screening Tests
+              {isDonor ? 'My Laboratory Screening Reports' : 'Laboratory Screening Bench'}
             </h2>
             <span style={{ fontSize: '11px', fontWeight: '800', backgroundColor: '#fbebee', color: 'var(--danger)', padding: '2px 8px', borderRadius: '4px' }}>
               RESTRICTED MAC LEVEL 3
             </span>
           </div>
           <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-            Mandatory infectious screening. Passing all 5 tests transitions units from QUARANTINE to AVAILABLE.
+            {isDonor
+              ? 'Infectious disease safety panel results for your donated blood units.'
+              : 'Mandatory infectious screening. Passing all 5 tests transitions units from QUARANTINE to AVAILABLE.'}
           </p>
         </div>
 
-        <button
-          onClick={() => setShowModal(true)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            backgroundColor: 'var(--primary)',
-            color: '#ffffff',
-            padding: '10px 18px',
-            borderRadius: 'var(--radius-md)',
-            fontWeight: '700',
-            fontSize: '13px'
-          }}
-        >
-          <Plus size={16} />
-          Record Lab Result
-        </button>
+        {isLabTech && (
+          <button
+            onClick={() => setShowModal(true)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              backgroundColor: 'var(--primary)',
+              color: '#ffffff',
+              padding: '10px 18px',
+              borderRadius: 'var(--radius-md)',
+              fontWeight: '700',
+              fontSize: '13px'
+            }}
+          >
+            <Plus size={16} />
+            Record Lab Result
+          </button>
+        )}
       </div>
 
       {message && (
@@ -107,20 +179,46 @@ export default function ScreeningsPage() {
 
       {/* Query Bar */}
       <div className="hope-card" style={{ padding: '20px', marginBottom: '24px', display: 'flex', gap: '16px', alignItems: 'center' }}>
-        <div style={{ fontSize: '13px', fontWeight: '700' }}>Inspection by Donation ID:</div>
-        <input
-          type="number"
-          value={donationId}
-          onChange={(e) => setDonationId(e.target.value)}
-          placeholder="Enter Donation ID"
-          style={{ padding: '8px 14px', borderRadius: '8px', border: '1px solid var(--border)', fontSize: '13px', width: '180px' }}
-        />
-        <button
-          onClick={() => loadScreenings(donationId)}
-          style={{ padding: '8px 18px', backgroundColor: 'var(--primary)', color: '#ffffff', borderRadius: '8px', fontWeight: '700', fontSize: '13px' }}
-        >
-          Search Screening Results
-        </button>
+        {isDonor ? (
+          <>
+            <div style={{ fontSize: '13px', fontWeight: '700' }}>Select Donation Event:</div>
+            {donorDonations.length === 0 ? (
+              <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>No donation records found.</span>
+            ) : (
+              <select
+                value={donationId}
+                onChange={(e) => {
+                  setDonationId(e.target.value);
+                  loadScreenings(e.target.value);
+                }}
+                style={{ padding: '8px 14px', borderRadius: '8px', border: '1px solid var(--border)', fontSize: '13px' }}
+              >
+                {donorDonations.map((d) => (
+                  <option key={d.donation_id} value={d.donation_id}>
+                    Donation #{d.donation_id} - {new Date(d.donated_at).toLocaleDateString()} ({d.volume_ml} mL)
+                  </option>
+                ))}
+              </select>
+            )}
+          </>
+        ) : (
+          <>
+            <div style={{ fontSize: '13px', fontWeight: '700' }}>Inspection by Donation ID:</div>
+            <input
+              type="number"
+              value={donationId}
+              onChange={(e) => setDonationId(e.target.value)}
+              placeholder="Enter Donation ID"
+              style={{ padding: '8px 14px', borderRadius: '8px', border: '1px solid var(--border)', fontSize: '13px', width: '180px' }}
+            />
+            <button
+              onClick={() => loadScreenings(donationId)}
+              style={{ padding: '8px 18px', backgroundColor: 'var(--primary)', color: '#ffffff', borderRadius: '8px', fontWeight: '700', fontSize: '13px' }}
+            >
+              Search Screening Results
+            </button>
+          </>
+        )}
       </div>
 
       {/* Test Status Overview Cards */}

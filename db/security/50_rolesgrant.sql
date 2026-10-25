@@ -101,7 +101,7 @@ GRANT UPDATE (date_of_birth, gender, blood_group, weight_kg, region_code,
               latitude, longitude, is_available) ON donor TO bb_officer;
 GRANT UPDATE (weight_kg, region_code, latitude, longitude, is_available) ON donor TO bb_donor;
 
-GRANT SELECT ON donor_contact TO bb_officer, bb_donor;                              -- ciphertext only
+GRANT SELECT ON donor_contact TO bb_officer, bb_admin, bb_donor;                              -- ciphertext only
 GRANT INSERT (donor_id, phone_enc, email_enc, address_enc, key_version) ON donor_contact TO bb_officer;
 GRANT UPDATE (phone_enc, email_enc, address_enc, key_version) ON donor_contact TO bb_officer, bb_donor;
 GRANT EXECUTE ON FUNCTION fn_encrypt_text(text), fn_decrypt_text(bytea) TO bb_officer, bb_admin, bb_donor;
@@ -109,7 +109,7 @@ GRANT EXECUTE ON FUNCTION fn_encrypt_text(text), fn_decrypt_text(bytea) TO bb_of
 -- 5) Donations, units, screening ---------------------------------------------------------------
 GRANT SELECT ON donation TO bb_admin, bb_officer, bb_lab_tech, bb_donor, bb_auditor;
 GRANT INSERT (donor_id, branch_id, donated_at, volume_ml, hemoglobin_gdl, collected_by)
-    ON donation TO bb_officer;
+    ON donation TO bb_officer, bb_admin;
 GRANT UPDATE (volume_ml, hemoglobin_gdl) ON donation TO bb_officer, bb_admin;
 
 GRANT SELECT ON blood_unit TO bb_admin, bb_officer, bb_lab_tech, bb_auditor;
@@ -118,14 +118,14 @@ GRANT UPDATE (status, storage_location) ON blood_unit TO bb_officer, bb_admin;
 
 GRANT SELECT ON screening_result TO bb_lab_tech, bb_donor;                          -- donor: own rows via RLS
 GRANT INSERT (donation_id, test_type, result, report, tested_by) ON screening_result TO bb_lab_tech;
-GRANT UPDATE (result, report) ON screening_result TO bb_lab_tech;
+GRANT UPDATE (result, report, tested_by, tested_at) ON screening_result TO bb_lab_tech;
 
 -- 6) Requests, allocation, alerts, ledger -----------------------------------------------------------
 GRANT SELECT ON blood_request TO bb_admin, bb_officer, bb_hospital, bb_auditor;
 GRANT INSERT (hospital_id, requested_by, patient_ref, blood_group, component,
-              units_needed, urgency, needed_by) ON blood_request TO bb_officer, bb_hospital;
+              units_needed, urgency, needed_by, status) ON blood_request TO bb_officer, bb_admin, bb_hospital;
 GRANT UPDATE (status, urgency, needed_by) ON blood_request TO bb_officer, bb_admin;
-GRANT UPDATE (status) ON blood_request TO bb_hospital;                              -- cancel own (RLS enforces)
+GRANT UPDATE (status, updated_at) ON blood_request TO bb_hospital;                              -- cancel own (RLS enforces)
 
 GRANT SELECT ON request_allocation TO bb_admin, bb_officer, bb_hospital, bb_auditor;
 GRANT INSERT (request_id, unit_id, allocated_by) ON request_allocation TO bb_officer, bb_admin;
@@ -133,6 +133,8 @@ GRANT INSERT (request_id, unit_id, allocated_by) ON request_allocation TO bb_off
 GRANT SELECT ON donor_alert TO bb_admin, bb_officer, bb_donor, bb_auditor;
 GRANT INSERT (request_id, donor_id, distance_km) ON donor_alert TO bb_officer, bb_admin;
 GRANT UPDATE (response, responded_at) ON donor_alert TO bb_officer, bb_donor;
+GRANT SELECT (request_id, hospital_id, blood_group, component, urgency, classification) ON blood_request TO bb_donor;
+GRANT SELECT (hospital_id, hospital_name, address) ON hospital TO bb_donor;
 
 GRANT SELECT ON stock_movement TO bb_admin, bb_officer, bb_lab_tech, bb_auditor;    -- rows written by triggers
 

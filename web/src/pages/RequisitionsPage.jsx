@@ -1,9 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { FileSpreadsheet, Plus, Zap, FileCode, CheckCircle2, AlertTriangle, Filter } from 'lucide-react';
+import { FileSpreadsheet, Plus, Zap, FileCode, CheckCircle2, AlertTriangle, Filter, XCircle } from 'lucide-react';
 import { requestApi } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import Modal from '../components/common/Modal';
 
 export default function RequisitionsPage() {
+  const { user } = useAuth();
+  const role = user?.role || user?.role_name;
+  const isHospital = role === 'hospital_user';
+  const canAllocate = ['bb_officer', 'admin'].includes(role);
+  const canCreate = ['hospital_user', 'bb_officer', 'admin'].includes(role);
+
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -12,7 +19,7 @@ export default function RequisitionsPage() {
   const [message, setMessage] = useState(null);
 
   const [form, setForm] = useState({
-    hospital_id: 1,
+    hospital_id: user?.hospital_id || 1,
     patient_ref: 'PT-' + Math.floor(10000 + Math.random() * 90000),
     blood_group: 'B+',
     component: 'RED_CELLS',
@@ -39,14 +46,14 @@ export default function RequisitionsPage() {
 
   useEffect(() => {
     loadRequests();
-  }, [urgencyFilter, statusFilter]);
+  }, [role, urgencyFilter, statusFilter]);
 
   const handleCreateRequest = async (e) => {
     e.preventDefault();
     try {
       await requestApi.createRequest({
         ...form,
-        hospital_id: Number(form.hospital_id),
+        hospital_id: isHospital ? Number(user?.hospital_id || form.hospital_id) : Number(form.hospital_id),
         units_needed: Number(form.units_needed)
       });
       setMessage({ type: 'success', text: 'Blood request registered in queue!' });
@@ -67,6 +74,17 @@ export default function RequisitionsPage() {
     }
   };
 
+  const handleCancelRequest = async (requestId) => {
+    if (!window.confirm(`Are you sure you want to cancel Requisition #${requestId}?`)) return;
+    try {
+      await requestApi.updateRequestStatus(requestId, 'CANCELLED');
+      setMessage({ type: 'success', text: `Requisition #${requestId} has been cancelled.` });
+      loadRequests();
+    } catch (err) {
+      setMessage({ type: 'error', text: err.message || 'Failed to cancel requisition' });
+    }
+  };
+
   const handleExportXml = (requestId) => {
     window.open(`/api/v1/export/requests/${requestId}.xml`, '_blank');
   };
@@ -76,30 +94,34 @@ export default function RequisitionsPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
         <div>
           <h2 style={{ fontSize: '24px', fontWeight: '800', color: 'var(--text-main)' }}>
-            Hospital Blood Requisitions
+            {isHospital ? 'Hospital Blood Orders & Requisitions' : 'Hospital Blood Requisitions'}
           </h2>
           <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-            Hospital demand tracking with automated First-Expiry-First-Out (FEFO) allocation
+            {isHospital
+              ? 'Submit and track patient blood requests with live dispatch status updates'
+              : 'Hospital demand tracking with automated First-Expiry-First-Out (FEFO) allocation'}
           </p>
         </div>
 
-        <button
-          onClick={() => setShowCreateModal(true)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            backgroundColor: 'var(--primary)',
-            color: '#ffffff',
-            padding: '10px 18px',
-            borderRadius: 'var(--radius-md)',
-            fontWeight: '700',
-            fontSize: '13px'
-          }}
-        >
-          <Plus size={16} />
-          New Blood Requisition
-        </button>
+        {canCreate && (
+          <button
+            onClick={() => setShowCreateModal(true)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              backgroundColor: 'var(--primary)',
+              color: '#ffffff',
+              padding: '10px 18px',
+              borderRadius: 'var(--radius-md)',
+              fontWeight: '700',
+              fontSize: '13px'
+            }}
+          >
+            <Plus size={16} />
+            {isHospital ? 'New Blood Requisition' : 'Create Requisition'}
+          </button>
+        )}
       </div>
 
       {message && (
@@ -209,7 +231,7 @@ export default function RequisitionsPage() {
                     </td>
                     <td style={{ padding: '14px 16px', textAlign: 'right' }}>
                       <div style={{ display: 'inline-flex', gap: '8px' }}>
-                        {isPending && (
+                        {canAllocate && isPending && (
                           <button
                             onClick={() => handleAllocate(r.request_id)}
                             style={{
@@ -226,6 +248,27 @@ export default function RequisitionsPage() {
                           >
                             <Zap size={13} />
                             FEFO
+                          </button>
+                        )}
+                        {isHospital && isPending && (
+                          <button
+                            onClick={() => handleCancelRequest(r.request_id)}
+                            title="Cancel Request"
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              backgroundColor: '#fee2e2',
+                              color: '#dc2626',
+                              padding: '6px 10px',
+                              borderRadius: '6px',
+                              fontSize: '12px',
+                              fontWeight: '700',
+                              border: '1px solid #fecaca'
+                            }}
+                          >
+                            <XCircle size={13} />
+                            Cancel
                           </button>
                         )}
                         <button
@@ -260,16 +303,18 @@ export default function RequisitionsPage() {
       {/* Create Requisition Modal */}
       <Modal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)} title="Create New Hospital Blood Requisition">
         <form onSubmit={handleCreateRequest} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          <div>
-            <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)' }}>Hospital ID *</label>
-            <input
-              type="number"
-              required
-              value={form.hospital_id}
-              onChange={(e) => setForm({ ...form, hospital_id: e.target.value })}
-              style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)', marginTop: '4px' }}
-            />
-          </div>
+          {!isHospital && (
+            <div>
+              <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)' }}>Hospital ID *</label>
+              <input
+                type="number"
+                required
+                value={form.hospital_id}
+                onChange={(e) => setForm({ ...form, hospital_id: e.target.value })}
+                style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)', marginTop: '4px' }}
+              />
+            </div>
+          )}
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             <div>

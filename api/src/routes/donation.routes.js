@@ -29,21 +29,12 @@ router.post('/', authenticate, authorizeRoles('bb_officer', 'admin'), validate(c
       const unitVolume = Math.floor(volume_ml / components.length);
 
       for (const component of components) {
+        // Triggers trg_unit_set_expiry generate barcode and compute expires_on
         const unitRes = await client.query(
-          `INSERT INTO blood_unit (donation_id, component, volume_ml, status, storage_location, expires_on, unit_code)
-           VALUES (
-             $1, $2, $3, 'QUARANTINE', 'INTAKE_BAY',
-             COALESCE(
-               (SELECT ($4::timestamptz + make_interval(days => shelf_life_days))::date FROM component_spec WHERE component = $2),
-               CURRENT_DATE + 35
-             ),
-             COALESCE(
-               'UNIT-' || $1 || '-' || $2 || '-' || floor(random() * 9000 + 1000),
-               'TEMP'
-             )
-           )
+          `INSERT INTO blood_unit (donation_id, component, volume_ml, storage_location)
+           VALUES ($1, $2, $3, 'INTAKE_BAY')
            RETURNING unit_id, unit_code, component, expires_on, status`,
-          [donationId, component, unitVolume, donated_at]
+          [donationId, component, unitVolume]
         );
         units.push(unitRes.rows[0]);
       }

@@ -25,7 +25,8 @@ export default function Sidebar({ isOpen = true, onToggle }) {
 
   // Return distinct navigation items curated specifically per user role
   const getNavSections = () => {
-    const role = user?.role;
+    const role = user?.role || user?.role_name;
+    if (!role) return [];
 
     // 1. HOSPITAL USER: Requisitions, Hospital Inventory, Live Stock, Tracking
     if (role === 'hospital_user') {
@@ -104,23 +105,27 @@ export default function Sidebar({ isOpen = true, onToggle }) {
       ];
     }
 
-    // 6. SYSTEM ADMINISTRATOR (default/admin): Full System Control
-    return [
-      {
-        title: 'Administration',
-        items: [
-          { name: 'Executive Overview', path: '/', icon: LayoutDashboard },
-          { name: 'Donor Registry', path: '/donors', icon: Users },
-          { name: 'Donations Intake', path: '/donations', icon: HeartHandshake },
-          { name: 'Laboratory Testing', path: '/screenings', icon: Microscope },
-          { name: 'Inventory & Cold-Chain', path: '/inventory', icon: PackageCheck },
-          { name: 'Requisitions Desk', path: '/requests', icon: FileSpreadsheet },
-          { name: 'Emergency Alerts', path: '/alerts', icon: Radio },
-          { name: 'Governance & Analytics', path: '/analytics', icon: BarChart3 },
-          { name: 'Cryptographic Audit', path: '/audit', icon: ShieldAlert }
-        ]
-      }
-    ];
+    // 6. SYSTEM ADMINISTRATOR: Full System Control
+    if (role === 'admin') {
+      return [
+        {
+          title: 'Administration',
+          items: [
+            { name: 'Executive Overview', path: '/', icon: LayoutDashboard },
+            { name: 'Donor Registry', path: '/donors', icon: Users },
+            { name: 'Donations Intake', path: '/donations', icon: HeartHandshake },
+            { name: 'Laboratory Testing', path: '/screenings', icon: Microscope },
+            { name: 'Inventory & Cold-Chain', path: '/inventory', icon: PackageCheck },
+            { name: 'Requisitions Desk', path: '/requests', icon: FileSpreadsheet },
+            { name: 'Emergency Alerts', path: '/alerts', icon: Radio },
+            { name: 'Governance & Analytics', path: '/analytics', icon: BarChart3 },
+            { name: 'Cryptographic Audit', path: '/audit', icon: ShieldAlert }
+          ]
+        }
+      ];
+    }
+
+    return [];
   };
 
   const navSections = getNavSections();
@@ -264,7 +269,7 @@ export default function Sidebar({ isOpen = true, onToggle }) {
           </div>
           <div style={{ display: 'flex', gap: '6px', marginTop: '6px' }}>
             <span style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '4px', backgroundColor: 'var(--primary-light)', color: 'var(--primary)', fontWeight: '700' }}>
-              {user.role}
+              {user.role || user.role_name}
             </span>
             <span style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '4px', backgroundColor: '#e6f7f8', color: 'var(--secondary)', fontWeight: '700' }}>
               MAC L{user.clearance}

@@ -4,7 +4,13 @@ import { authApi } from '../services/api';
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
+  const [user, setUser] = useState(() => {
+    const saved = localStorage.getItem('bb_user');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) { return null; }
+    }
+    return null;
+  });
   const [token, setToken] = useState(localStorage.getItem('bb_token'));
   const [loading, setLoading] = useState(true);
 
@@ -14,9 +20,13 @@ export function AuthProvider({ children }) {
         try {
           const res = await authApi.getMe();
           setUser(res.data);
+          localStorage.setItem('bb_user', JSON.stringify(res.data));
         } catch (err) {
           console.error('Failed to load user session:', err);
-          logout();
+          // If token explicitly expired (401), log out
+          if (err.status === 401) {
+            logout();
+          }
         }
       }
       setLoading(false);

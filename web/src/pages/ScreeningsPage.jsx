@@ -18,17 +18,22 @@ export default function ScreeningsPage() {
   });
 
   const loadScreenings = async (id = donationId) => {
-    if (!id) return;
     try {
       setLoading(true);
-      const res = await screeningApi.getScreenings(id);
+      setMessage(null);
+      const res = id ? await screeningApi.getScreenings(id) : await screeningApi.getScreenings();
       setScreenings(res.data || []);
     } catch (err) {
       console.error('Failed to load screenings:', err);
+      setMessage({ type: 'error', text: err.message || 'Failed to load screening tests' });
     } finally {
       setLoading(false);
     }
   };
+
+  React.useEffect(() => {
+    loadScreenings(donationId);
+  }, []);
 
   const handleTestSubmit = async (e) => {
     e.preventDefault();

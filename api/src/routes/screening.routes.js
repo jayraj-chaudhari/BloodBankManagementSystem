@@ -52,7 +52,28 @@ router.get('/', authenticate, async (req, res, next) => {
   try {
     const { donation_id } = req.query;
     if (!donation_id) {
-      return res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'donation_id query parameter is required' } });
+      if (req.user.role === 'donor') {
+        return res.status(400).json({ error: { code: 'VALIDATION_ERROR', message: 'donation_id query parameter is required for donors' } });
+      }
+
+      // For lab technicians and auditors: return recent screenings across donations
+      const rows = await withContext(req.user, async (client) => {
+        const q = `
+          SELECT s.screening_id, s.donation_id, s.test_type, s.result, s.report,
+                 s.tested_at, u.full_name AS tested_by_name
+            FROM screening_result s
+            LEFT JOIN app_user u ON u.user_id = s.tested_by
+           ORDER BY s.tested_at DESC
+           LIMIT 50
+        `;
+        const resQuery = await client.query(q);
+        return resQuery.rows;
+      });
+
+      return res.status(200).json({
+        data: rows,
+        meta: { page: 1, limit: rows.length, total: rows.length }
+      });
     }
 
     const donationId = parseInt(donation_id, 10);

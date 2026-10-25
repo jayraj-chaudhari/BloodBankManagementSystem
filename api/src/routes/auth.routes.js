@@ -269,7 +269,12 @@ router.get('/me', authenticate, async (req, res, next) => {
       });
     }
 
-    return res.status(200).json({ data: user });
+    return res.status(200).json({
+      data: {
+        ...user,
+        role: user.role_name
+      }
+    });
   } catch (err) {
     next(err);
   }

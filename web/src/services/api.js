@@ -59,6 +59,7 @@ export const inventoryApi = {
 export const donorApi = {
   getDonors: (params) => api.get('/donors', { params }),
   getDonorMe: () => api.get('/donors/me'),
+  getMe: () => api.get('/donors/me'),
   getDonorById: (id) => api.get(`/donors/${id}`),
   getDonorContact: (id) => api.get(`/donors/${id}/contact`),
   updateDonor: (id, data) => api.patch(`/donors/${id}`, data)
@@ -83,7 +84,9 @@ export const requestApi = {
   getRequestById: (id) => api.get(`/requests/${id}`),
   createRequest: (data) => api.post('/requests', data),
   allocateFEFO: (requestId) => api.post(`/requests/${requestId}/allocate`),
-  updateStatus: (requestId, status) => api.patch(`/requests/${requestId}/status`, { status })
+  updateStatus: (requestId, status) => api.patch(`/requests/${requestId}/status`, { status }),
+  updateRequestStatus: (requestId, status) => api.patch(`/requests/${requestId}/status`, { status }),
+  cancelRequest: (requestId) => api.patch(`/requests/${requestId}/status`, { status: 'CANCELLED' })
 };
 
 // 7. Emergency Alerts APIs
@@ -93,7 +96,7 @@ export const alertApi = {
     api.post(`/requests/${requestId}/alerts`, { radius_km: radiusKm, max_donors: maxDonors }),
   getAlertsMe: () => api.get('/alerts/me'),
   getMyAlerts: () => api.get('/alerts/me'),
-  createAlert: (requestId, data) => api.post(/requests//alerts, data),
+  createAlert: (requestId, data) => api.post(`/requests/${requestId}/alerts`, data),
   respondAlert: (alertId, response) => api.post(`/alerts/${alertId}/respond`, { response })
 };
 
@@ -120,6 +123,6 @@ export default api;
 // Unit Management APIs
 export const unitApi = {
   getUnits: (params) => api.get('/units', { params }),
-  getUnitById: (id) => api.get(/units/),
-  updateUnitStatus: (id, status, storage_location) => api.patch(/units//status, { status, storage_location })
+  getUnitById: (id) => api.get(`/units/${id}`),
+  updateUnitStatus: (id, status, storage_location) => api.patch(`/units/${id}/status`, { status, storage_location })
 };

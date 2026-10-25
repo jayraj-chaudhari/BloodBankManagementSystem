@@ -31,17 +31,19 @@ export default function DashboardPage() {
   const toast = useToast();
   const { isConnected, lastInventoryEvent, liveAlerts } = useSocket();
 
+  const role = user?.role || user?.role_name;
+
   // If user role is Hospital, Donor, Lab Tech, or Auditor, render their dedicated production portal
-  if (user?.role === 'hospital_user') {
+  if (role === 'hospital_user') {
     return <HospitalDashboard />;
   }
-  if (user?.role === 'donor') {
+  if (role === 'donor') {
     return <DonorDashboard />;
   }
-  if (user?.role === 'lab_tech') {
+  if (role === 'lab_tech') {
     return <LabTechDashboard />;
   }
-  if (user?.role === 'auditor') {
+  if (role === 'auditor') {
     return <AuditorDashboard />;
   }
 
@@ -182,6 +184,21 @@ export default function DashboardPage() {
   };
 
   // 3. FEFO Allocation
+  const handleAllocateFirstQuick = async () => {
+    const firstPending = recentRequests.find(r => r.status === 'PENDING' || r.status === 'PARTIAL');
+    if (!firstPending) {
+      toast.info('No pending requisitions in queue requiring allocation.', 'Queue Clear');
+      return;
+    }
+    try {
+      const res = await requestApi.allocateFEFO(firstPending.request_id);
+      toast.success(`FEFO allocation completed for Request #${firstPending.request_id}!`, 'FEFO Success');
+      loadDashboardData();
+    } catch (err) {
+      toast.error(err.message || 'Allocation failed');
+    }
+  };
+
   const handleAllocateFEFO = async (e) => {
     e.preventDefault();
     try {
@@ -481,7 +498,7 @@ export default function DashboardPage() {
             </div>
           </div>
           <button
-            onClick={() => setShowFEFOModal(true)}
+            onClick={handleAllocateFirstQuick}
             style={{
               display: 'flex',
               alignItems: 'center',

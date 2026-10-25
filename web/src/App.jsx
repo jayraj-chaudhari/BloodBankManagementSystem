@@ -22,7 +22,8 @@ function ProtectedRoute({ children, allowedRoles }) {
   if (loading) return null;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
 
-  if (allowedRoles && user?.role && !allowedRoles.includes(user.role)) {
+  const role = user?.role || user?.role_name;
+  if (allowedRoles && role && !allowedRoles.includes(role)) {
     return <Navigate to="/" replace />;
   }
 

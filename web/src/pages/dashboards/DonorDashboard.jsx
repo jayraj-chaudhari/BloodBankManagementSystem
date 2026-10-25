@@ -32,26 +32,30 @@ export default function DonorDashboard() {
       setLoading(true);
       // 1. Fetch own donor profile via /donors/me (RLS enforced)
       try {
-        const profRes = await donorApi.getMe();
+        const profRes = await donorApi.getDonorMe();
         setDonorProfile(profRes.data);
       } catch (err) {
         console.warn('Could not load specific donor profile:', err);
       }
 
-      // 2. Fetch my donation history
+      // 2. Fetch my donation history via /donations/me
+      let myDonations = [];
       try {
-        const donRes = await donationApi.getDonations({ limit: 10 });
-        setDonations(donRes.data || []);
+        const donRes = await donationApi.getDonationsMe();
+        myDonations = donRes.data || [];
+        setDonations(myDonations);
       } catch (err) {
         console.warn('Donations load:', err);
       }
 
-      // 3. Fetch screening results (for donors own tests)
-      try {
-        const scrRes = await screeningApi.getScreenings({ limit: 10 });
-        setScreenings(scrRes.data || []);
-      } catch (err) {
-        console.warn('Screenings load:', err);
+      // 3. Fetch screening results for the donor's latest donation
+      if (myDonations.length > 0 && myDonations[0]?.donation_id) {
+        try {
+          const scrRes = await screeningApi.getScreenings(myDonations[0].donation_id);
+          setScreenings(scrRes.data || []);
+        } catch (err) {
+          console.warn('Screenings load:', err);
+        }
       }
 
       // 4. Fetch emergency donor alerts targeted to me

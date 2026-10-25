@@ -6,6 +6,9 @@ import Modal from '../components/common/Modal';
 
 export default function EmergencyAlertsPage() {
   const { user } = useAuth();
+  const role = user?.role || user?.role_name;
+  const isDonor = role === 'donor';
+
   const [donorAlerts, setDonorAlerts] = useState([]);
   const [requests, setRequests] = useState([]);
   const [selectedReqId, setSelectedReqId] = useState('');
@@ -17,7 +20,7 @@ export default function EmergencyAlertsPage() {
   const loadData = async () => {
     try {
       setLoading(true);
-      if (user?.role === 'donor') {
+      if (isDonor) {
         const res = await alertApi.getAlertsMe();
         setDonorAlerts(res.data || []);
       } else {
@@ -33,7 +36,7 @@ export default function EmergencyAlertsPage() {
 
   useEffect(() => {
     loadData();
-  }, [user]);
+  }, [role]);
 
   const handleDispatch = async (e) => {
     e.preventDefault();
@@ -88,7 +91,7 @@ export default function EmergencyAlertsPage() {
         </div>
       )}
 
-      {user?.role === 'donor' ? (
+      {isDonor ? (
         /* Donor View */
         <div className="hope-card" style={{ padding: '24px' }}>
           <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '16px' }}>

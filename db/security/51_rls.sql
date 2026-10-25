@@ -43,7 +43,7 @@ CREATE POLICY own_row ON donor TO bb_donor
     WITH CHECK (donor_id = (SELECT fn_ctx_int('donor_id')));
 
 -- donor_contact (class 2) ---------------------------------------------------------------
-CREATE POLICY staff_mac ON donor_contact TO bb_officer
+CREATE POLICY staff_mac ON donor_contact TO bb_officer, bb_admin
     USING      (classification <= (SELECT fn_ctx_clearance()))
     WITH CHECK (classification <= (SELECT fn_ctx_clearance()));
 CREATE POLICY own_row ON donor_contact TO bb_donor

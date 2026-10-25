@@ -94,13 +94,25 @@ CORS_ORIGIN=http://localhost:5173
 
 ### 4. Database Setup & Seeding
 
-> 💡 **PostgreSQL Password Tip**:  
-> The first command runs as the `postgres` superuser and will prompt for your local PostgreSQL password. To run it smoothly without manual prompts, set your password in your terminal session before running:
-> - **PowerShell (Windows)**: `$env:PGPASSWORD="your_postgres_password"`
-> - **Command Prompt (cmd)**: `set PGPASSWORD=your_postgres_password`
-> - **Bash (Linux / macOS)**: `export PGPASSWORD="your_postgres_password"`
->
-> *(All subsequent scripts connect as `bb_owner` using the connection string with the pre-configured password `owner_pw`).*
+You can set up the database using either the automated Node script (recommended) or manual `psql` commands:
+
+#### Option A: Automated Script (Recommended — No `psql` path configuration required)
+Make sure your `.env` has your PostgreSQL superuser password configured in `PG_SUPERUSER_URL` (e.g. `postgres://postgres:<your_password>@localhost:5432/postgres`), then run:
+
+```bash
+# Sets up database, applies all schemas, functions, views, RLS, and seed data
+npm run db:reset
+```
+
+---
+
+#### Option B: Manual `psql` Command Line
+*(If `'psql'` is not recognized in your Windows PowerShell, add PostgreSQL to your session PATH first: `$env:Path += ";C:\Program Files\PostgreSQL\18\bin"`).*
+
+> 💡 **Password Tip**: To avoid repeated password prompts, set your password in your session before running:
+> - **PowerShell**: `$env:PGPASSWORD="your_postgres_password"`
+> - **Command Prompt**: `set PGPASSWORD=your_postgres_password`
+> - **Linux / macOS**: `export PGPASSWORD="your_postgres_password"`
 
 ```bash
 # 1) Initialize database and create roles (run as postgres superuser)

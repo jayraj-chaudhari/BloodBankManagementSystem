@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Microscope, CheckCircle2, XCircle, AlertCircle, Plus, ShieldCheck, Lock } from 'lucide-react';
+import { Microscope, CheckCircle2, XCircle, AlertCircle, Plus, ShieldCheck, Lock, Activity, Check } from 'lucide-react';
 import { screeningApi, donationApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useSocket } from '../context/SocketContext';
 import Modal from '../components/common/Modal';
 
 export default function ScreeningsPage() {
   const { user } = useAuth();
+  const { lastDonationEvent } = useSocket();
   const role = user?.role || user?.role_name;
   const isLabTech = role === 'lab_tech';
   const isDonor = role === 'donor';
@@ -13,7 +15,9 @@ export default function ScreeningsPage() {
   const [donationId, setDonationId] = useState('1');
   const [donorDonations, setDonorDonations] = useState([]);
   const [screenings, setScreenings] = useState([]);
+  const [pendingQueue, setPendingQueue] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [pendingLoading, setPendingLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [message, setMessage] = useState(null);
 
@@ -38,6 +42,19 @@ export default function ScreeningsPage() {
     }
   };
 
+  const loadPendingQueue = async () => {
+    if (!isLabTech) return;
+    try {
+      setPendingLoading(true);
+      const res = await screeningApi.getPendingScreenings();
+      setPendingQueue(res.data || []);
+    } catch (err) {
+      console.error('Failed to load pending screenings:', err);
+    } finally {
+      setPendingLoading(false);
+    }
+  };
+
   const loadScreenings = async (id = donationId) => {
     if (!id) return;
     try {
@@ -58,8 +75,9 @@ export default function ScreeningsPage() {
       loadDonorDonations();
     } else if (isLabTech) {
       loadScreenings(donationId);
+      loadPendingQueue();
     }
-  }, [role]);
+  }, [role, lastDonationEvent]);
 
   const handleTestSubmit = async (e) => {
     e.preventDefault();
@@ -74,8 +92,30 @@ export default function ScreeningsPage() {
       setMessage({ type: 'success', text: `Recorded ${form.test_type} screening as ${form.result}!` });
       setShowModal(false);
       loadScreenings(form.donation_id);
+      loadPendingQueue();
     } catch (err) {
       setMessage({ type: 'error', text: err.message || 'Screening submission failed' });
+    }
+  };
+
+  const handleQuickPassAll = async (pendingItem) => {
+    try {
+      setMessage(null);
+      for (const t of pendingItem.missing_tests) {
+        await screeningApi.createScreening({
+          donation_id: pendingItem.donation_id,
+          test_type: t,
+          result: 'NEGATIVE',
+          report: { method: 'CHEMILUMINESCENCE_AUTOMATED', result: 'NON_REACTIVE' }
+        });
+      }
+      setMessage({ type: 'success', text: `Completed all ${pendingItem.missing_tests.length} remaining tests for Donation #${pendingItem.donation_id}. Units released to AVAILABLE!` });
+      loadPendingQueue();
+      if (donationId === String(pendingItem.donation_id)) {
+        loadScreenings(donationId);
+      }
+    } catch (err) {
+      setMessage({ type: 'error', text: err.message || 'Failed to complete remaining tests' });
     }
   };
 
@@ -174,6 +214,165 @@ export default function ScreeningsPage() {
           fontSize: '13px'
         }}>
           {message.text}
+        </div>
+      )}
+
+      {/* Lab Tech Pending Screening Queue */}
+      {isLabTech && (
+        <div className="hope-card" style={{ padding: '24px', marginBottom: '24px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Activity size={18} style={{ color: 'var(--primary)' }} />
+              <h3 style={{ fontSize: '16px', fontWeight: '800', color: 'var(--text-main)', margin: 0 }}>
+                Pending Blood Lab Screening Queue ({pendingQueue.length})
+              </h3>
+            </div>
+            <button
+              onClick={loadPendingQueue}
+              style={{
+                fontSize: '12px',
+                fontWeight: '600',
+                color: 'var(--primary)',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer'
+              }}
+            >
+              Refresh Queue
+            </button>
+          </div>
+
+          {pendingLoading ? (
+            <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-muted)' }}>Checking pending specimens...</div>
+          ) : pendingQueue.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)', fontSize: '13px' }}>
+              No specimens pending testing. All collected units are screened or discarded.
+            </div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--text-muted)', fontSize: '11px', textTransform: 'uppercase' }}>
+                    <th style={{ padding: '10px 14px' }}>Donation ID</th>
+                    <th style={{ padding: '10px 14px' }}>Blood Group</th>
+                    <th style={{ padding: '10px 14px' }}>Donor</th>
+                    <th style={{ padding: '10px 14px' }}>Donated At</th>
+                    <th style={{ padding: '10px 14px' }}>Quarantine Units</th>
+                    <th style={{ padding: '10px 14px' }}>Tests Remaining</th>
+                    <th style={{ padding: '10px 14px', textAlign: 'right' }}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pendingQueue.map((item) => (
+                    <tr key={item.donation_id} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                      <td style={{ padding: '12px 14px', fontWeight: '800' }}>
+                        Donation #{item.donation_id}
+                      </td>
+                      <td style={{ padding: '12px 14px' }}>
+                        <span style={{
+                          fontWeight: '800',
+                          color: '#dc2626',
+                          backgroundColor: '#fee2e2',
+                          padding: '3px 8px',
+                          borderRadius: '6px',
+                          fontSize: '12px'
+                        }}>
+                          {item.blood_group}
+                        </span>
+                      </td>
+                      <td style={{ padding: '12px 14px', color: 'var(--text-main)', fontWeight: '600' }}>
+                        {item.donor_name}
+                      </td>
+                      <td style={{ padding: '12px 14px', color: 'var(--text-muted)', fontSize: '12px' }}>
+                        {new Date(item.donated_at).toLocaleDateString()}
+                      </td>
+                      <td style={{ padding: '12px 14px' }}>
+                        <span style={{
+                          backgroundColor: '#fffbeb',
+                          color: '#d97706',
+                          padding: '3px 8px',
+                          borderRadius: '6px',
+                          fontSize: '12px',
+                          fontWeight: '700'
+                        }}>
+                          {item.quarantine_units} in Quarantine
+                        </span>
+                      </td>
+                      <td style={{ padding: '12px 14px' }}>
+                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                          {item.missing_tests.map((test) => (
+                            <span
+                              key={test}
+                              style={{
+                                fontSize: '11px',
+                                fontWeight: '700',
+                                padding: '2px 6px',
+                                borderRadius: '4px',
+                                backgroundColor: '#f3f4f6',
+                                color: '#4b5563',
+                                border: '1px solid #e5e7eb'
+                              }}
+                            >
+                              {test}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                      <td style={{ padding: '12px 14px', textAlign: 'right' }}>
+                        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                          <button
+                            onClick={() => {
+                              setDonationId(String(item.donation_id));
+                              loadScreenings(item.donation_id);
+                              setForm({
+                                donation_id: String(item.donation_id),
+                                test_type: item.missing_tests[0] || 'HIV',
+                                result: 'NEGATIVE',
+                                notes: 'Screening panel passed'
+                              });
+                              setShowModal(true);
+                            }}
+                            style={{
+                              padding: '6px 12px',
+                              backgroundColor: 'var(--primary)',
+                              color: '#fff',
+                              borderRadius: '6px',
+                              fontSize: '12px',
+                              fontWeight: '700',
+                              border: 'none',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            Run Test
+                          </button>
+                          <button
+                            onClick={() => handleQuickPassAll(item)}
+                            title="Record all missing tests as NEGATIVE and release to AVAILABLE"
+                            style={{
+                              padding: '6px 12px',
+                              backgroundColor: '#e8f5ec',
+                              color: 'var(--success)',
+                              border: '1px solid var(--success)',
+                              borderRadius: '6px',
+                              fontSize: '12px',
+                              fontWeight: '700',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}
+                          >
+                            <Check size={14} />
+                            Pass All Negative
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
 

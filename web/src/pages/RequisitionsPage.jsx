@@ -2,10 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { FileSpreadsheet, Plus, Zap, FileCode, CheckCircle2, AlertTriangle, Filter, XCircle } from 'lucide-react';
 import { requestApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useSocket } from '../context/SocketContext';
 import Modal from '../components/common/Modal';
 
 export default function RequisitionsPage() {
   const { user } = useAuth();
+  const { lastRequestEvent } = useSocket();
   const role = user?.role || user?.role_name;
   const isHospital = role === 'hospital_user';
   const canAllocate = ['bb_officer', 'admin'].includes(role);
@@ -46,7 +48,7 @@ export default function RequisitionsPage() {
 
   useEffect(() => {
     loadRequests();
-  }, [role, urgencyFilter, statusFilter]);
+  }, [role, urgencyFilter, statusFilter, lastRequestEvent]);
 
   const handleCreateRequest = async (e) => {
     e.preventDefault();

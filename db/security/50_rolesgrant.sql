@@ -131,7 +131,7 @@ GRANT SELECT ON request_allocation TO bb_admin, bb_officer, bb_hospital, bb_audi
 GRANT INSERT (request_id, unit_id, allocated_by) ON request_allocation TO bb_officer, bb_admin;
 
 GRANT SELECT ON donor_alert TO bb_admin, bb_officer, bb_donor, bb_auditor;
-GRANT INSERT (request_id, donor_id, distance_km) ON donor_alert TO bb_officer, bb_admin;
+GRANT INSERT (request_id, donor_id, distance_km, response) ON donor_alert TO bb_officer, bb_admin;
 GRANT UPDATE (response, responded_at) ON donor_alert TO bb_officer, bb_donor;
 GRANT SELECT (request_id, hospital_id, blood_group, component, urgency, classification) ON blood_request TO bb_donor;
 GRANT SELECT (hospital_id, hospital_name, address) ON hospital TO bb_donor;

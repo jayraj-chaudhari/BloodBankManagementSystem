@@ -12,12 +12,14 @@ export function SocketProvider({ children }) {
   const [isConnected, setIsConnected] = useState(false);
   const [liveAlerts, setLiveAlerts] = useState([]);
   const [lastInventoryEvent, setLastInventoryEvent] = useState(null);
+  const [lastRequestEvent, setLastRequestEvent] = useState(null);
 
   useEffect(() => {
-    // Connect directly to backend port with automatic reconnection & transports
+    const token = localStorage.getItem('bb_token');
     const socketUrl = import.meta.env.VITE_WS_URL || 'http://localhost:3000';
     const s = io(socketUrl, {
       transports: ['websocket', 'polling'],
+      auth: { token },
       reconnectionAttempts: 10,
       reconnectionDelay: 2000,
       autoConnect: true
@@ -25,14 +27,20 @@ export function SocketProvider({ children }) {
 
     s.on('connect', () => {
       setIsConnected(true);
-      // Join role room if user is authenticated
-      if (user?.role) {
-        s.emit('join', `role:${user.role}`);
+      if (token) {
+        s.emit('authenticate', token);
+      }
+      const role = user?.role || user?.role_name;
+      if (role) {
+        s.emit('join_role', role);
+        s.emit('join', `role_${role}`);
         if (user.donor_id) {
-          s.emit('join', `donor:${user.donor_id}`);
+          s.emit('join_donor', user.donor_id);
+          s.emit('join', `donor_${user.donor_id}`);
         }
         if (user.hospital_id) {
-          s.emit('join', `hospital:${user.hospital_id}`);
+          s.emit('join_hospital', user.hospital_id);
+          s.emit('join', `hospital_${user.hospital_id}`);
         }
       }
     });
@@ -50,22 +58,40 @@ export function SocketProvider({ children }) {
       );
     });
 
+    s.on('emergency_alert_broadcast', (data) => {
+      setLiveAlerts((prev) => [data, ...prev]);
+    });
+
     // Listen for inventory updates
     s.on('inventory_update', (data) => {
       setLastInventoryEvent(data);
-      if (['admin', 'bb_officer', 'hospital_user'].includes(user?.role)) {
+      const role = user?.role || user?.role_name;
+      if (['admin', 'bb_officer', 'hospital_user', 'lab_tech'].includes(role)) {
         toast.info(
-          `Unit ${data.unit_code || ''} is now ${data.status} (${data.component || ''})`,
-          'Inventory Update'
+          `Inventory Update: ${data.action || 'Unit status change'} ${data.unit_code ? `(${data.unit_code})` : ''}`,
+          'Stock Updated'
         );
       }
     });
 
-    // Listen for request status updates
+    // Listen for new incoming blood requests
+    s.on('new_blood_request', (data) => {
+      setLastRequestEvent(data);
+      const role = user?.role || user?.role_name;
+      if (['admin', 'bb_officer'].includes(role)) {
+        toast.info(
+          `New ${data.urgency || 'ROUTINE'} Requisition #${data.request_id} received for ${data.blood_group} ${data.component}!`,
+          'Incoming Order'
+        );
+      }
+    });
+
+    // Listen for request status updates (allocation, cancellation, fulfillment)
     s.on('request_update', (data) => {
+      setLastRequestEvent(data);
       toast.info(
-        `Request #${data.request_id || ''} status updated to ${data.status}`,
-        'Requisition Status'
+        `Requisition #${data.request_id || ''} is now ${data.status || 'UPDATED'}`,
+        'Order Status Changed'
       );
     });
 
@@ -85,6 +111,7 @@ export function SocketProvider({ children }) {
         isConnected,
         liveAlerts,
         lastInventoryEvent,
+        lastRequestEvent,
         clearAlerts
       }}
     >

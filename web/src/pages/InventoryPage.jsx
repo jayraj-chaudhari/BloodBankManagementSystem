@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { PackageCheck, Clock, AlertTriangle, ShieldCheck, RefreshCw, Filter, Layers } from 'lucide-react';
 import { inventoryApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useSocket } from '../context/SocketContext';
 
 export default function InventoryPage() {
   const { user } = useAuth();
+  const { lastInventoryEvent } = useSocket();
   const role = user?.role || user?.role_name;
   const isHospital = role === 'hospital_user';
   const canModify = ['bb_officer', 'admin'].includes(role);
@@ -45,7 +47,7 @@ export default function InventoryPage() {
 
   useEffect(() => {
     loadStock();
-  }, [role, statusFilter, componentFilter, expiringFilter]);
+  }, [role, statusFilter, componentFilter, expiringFilter, lastInventoryEvent]);
 
   const handleExpireSweep = async () => {
     try {

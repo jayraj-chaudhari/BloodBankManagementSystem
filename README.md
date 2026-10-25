@@ -33,7 +33,7 @@ PulseNet provides dedicated, customized interfaces and service boundaries for ea
 - **Mandatory Access Control (MAC)**: Enforced via PostgreSQL `FORCE ROW LEVEL SECURITY`. Every database session sets `app.user_id`, `app.role`, and `app.clearance` within transaction boundaries.
 - **Discretionary Access Control (DAC)**: The API connects via unprivileged user `bb_app`, assuming localized database roles (`bb_admin`, `bb_officer`, etc.) per request transaction. Sensitive columns like `password_hash` and `donor_contact` are restricted at the database catalog level.
 - **Field-Level Encryption (`pgcrypto`)**: Donor phone numbers, email addresses, and residential addresses are stored as AES-256 encrypted bytea columns (`phone_enc`, `email_enc`, `address_enc`).
-- **Cryptographic Audit Trail**: All security-critical events (logins, status changes, PII reveals, blood allocations) are logged into MongoDB with SHA-256 cryptographic hash chaining (`prev_hash` $\to$ `curr_hash`), verifiable for zero-tampering.
+- **Cryptographic Audit Trail**: All security-critical events (logins, status changes, PII reveals, blood allocations) are logged into MongoDB with SHA-256 cryptographic hash chaining (`prev_hash` → `curr_hash`), verifiable for zero-tampering.
 - **Stock Ledger Partitioning**: High-volume `stock_movement` records are list-partitioned by regional zones (`SUR`, `AHM`, `VAD`, `RAJ`) for optimal query isolation.
 
 ---
@@ -99,6 +99,7 @@ You can set up the database using either the automated Node script (recommended)
 #### Option A: Automated Script (Recommended — No `psql` path configuration required)
 Make sure your `.env` has your PostgreSQL superuser password configured in `PG_SUPERUSER_URL` (e.g. `postgres://postgres:<your_password>@localhost:5432/postgres`), then run:
 
+#### On Linux / macOS (Bash):
 ```bash
 # Sets up database, applies all schemas, functions, views, RLS, and seed data
 npm run db:reset
@@ -135,7 +136,25 @@ psql "postgresql://bb_owner:owner_pw@localhost:5432/bloodbank" -f db/seed/seed_d
 
 ---
 
-### 5. Start the Services
+### 5. Dummy Data Insertion & Utility Scripts
+
+The project includes deterministic datasets and built-in automation scripts for database seeding, maintenance, and role testing:
+
+#### Seed & Dummy Data Files
+- **`db/seed/60_lookups.sql`**: Master reference data for geographic regions (`SUR`, `AHM`, `VAD`, `RAJ`), Bell-LaPadula clearance roles, component shelf-life specifications (`component_spec`), and blood bank branches.
+- **`db/seed/seed_data.sql`**: Comprehensive SQL seed script inserting 80+ diverse voluntary donors, 9 affiliated hospitals, pre-tested blood units across all component types, and pre-configured staff accounts.
+
+#### Pre-Configured Automation Scripts (`scripts/`)
+| Script / NPM Command | Description |
+| :--- | :--- |
+| **`npm run db:setup`** | Node.js script (`scripts/db-setup.js`) executing all SQL migration scripts in sequence using the `pg` client. |
+| **`npm run db:seed`** | Deterministic data generator (`scripts/seed.js`) generating clinical donations, 5-point lab screenings, stock units, hospital requests, allocations, and emergency alerts. |
+| **`npm run db:reset`** | Full reset command (`scripts/db-reset.js`) that drops, rebuilds, and reseeds the entire database to a clean testing state. |
+| **`node scripts/test-all-roles-e2e.js`** | Automated end-to-end integration test verifying authentication, DAC column redactions, RLS tenant isolation, and workflows across all 6 roles. |
+
+---
+
+### 6. Start the Services
 
 Open two terminal sessions:
 
@@ -187,6 +206,11 @@ All seeded demo accounts use the standard password: `Test@1234`
 │   ├── security/           # DAC (Role Grants) & MAC (Row-Level Security)
 │   ├── seed/               # Reference lookups & sample dataset
 │   └── docs/               # 3NF Proofs, ER Diagram & Technical Reports
+├── scripts/                # Database automation & E2E verification test suites
+│   ├── db-setup.js         # Automated schema migration runner
+│   ├── seed.js             # Deterministic mock dataset generator
+│   ├── db-reset.js         # Complete drop, rebuild, and reseed utility
+│   └── test-all-roles-e2e.js # Multi-role integration verification test
 ├── web/                    # React 18 + Vite Web Application
 │   ├── src/
 │   │   ├── components/     # Layout, Sidebar, Modals, Badges, Metrics

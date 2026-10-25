@@ -124,14 +124,14 @@ GRANT UPDATE (result, report) ON screening_result TO bb_lab_tech;
 GRANT SELECT ON blood_request TO bb_admin, bb_officer, bb_hospital, bb_auditor;
 GRANT INSERT (hospital_id, requested_by, patient_ref, blood_group, component,
               units_needed, urgency, needed_by) ON blood_request TO bb_officer, bb_hospital;
-GRANT UPDATE (status, urgency, needed_by) ON blood_request TO bb_officer;
+GRANT UPDATE (status, urgency, needed_by) ON blood_request TO bb_officer, bb_admin;
 GRANT UPDATE (status) ON blood_request TO bb_hospital;                              -- cancel own (RLS enforces)
 
 GRANT SELECT ON request_allocation TO bb_admin, bb_officer, bb_hospital, bb_auditor;
 GRANT INSERT (request_id, unit_id, allocated_by) ON request_allocation TO bb_officer;
 
 GRANT SELECT ON donor_alert TO bb_admin, bb_officer, bb_donor, bb_auditor;
-GRANT INSERT (request_id, donor_id, distance_km) ON donor_alert TO bb_officer;
+GRANT INSERT (request_id, donor_id, distance_km) ON donor_alert TO bb_officer, bb_admin;
 GRANT UPDATE (response, responded_at) ON donor_alert TO bb_officer, bb_donor;
 
 GRANT SELECT ON stock_movement TO bb_admin, bb_officer, bb_lab_tech, bb_auditor;    -- rows written by triggers

@@ -577,16 +577,21 @@ export default function DashboardPage() {
                       <span style={{
                         padding: '3px 8px',
                         borderRadius: '4px',
-                        backgroundColor: r.status === 'APPROVED' ? '#dcfce7' : '#fef3c7',
-                        color: r.status === 'APPROVED' ? '#15803d' : '#b45309',
+                        backgroundColor: (r.status === 'APPROVED' || r.status === 'FULFILLED' || (r.units_allocated >= r.units_needed && r.units_needed > 0)) ? '#dcfce7' : '#fef3c7',
+                        color: (r.status === 'APPROVED' || r.status === 'FULFILLED' || (r.units_allocated >= r.units_needed && r.units_needed > 0)) ? '#15803d' : '#b45309',
                         fontWeight: '700',
                         fontSize: '11px'
                       }}>
-                        {r.status}
+                        {(r.units_allocated >= r.units_needed && r.units_needed > 0) ? 'FULFILLED' : r.status}
                       </span>
                     </td>
                     <td style={{ padding: '12px 8px' }}>
-                      <button
+                      {(r.status === 'FULFILLED' || (r.units_allocated >= r.units_needed && r.units_needed > 0)) ? (
+                        <span style={{ fontSize: '11px', color: '#15803d', fontWeight: '700' }}>
+                          ✓ Allocated
+                        </span>
+                      ) : (
+                        <button
                         onClick={() => {
                           setFefoForm({ request_id: r.request_id });
                           setShowFEFOModal(true);
@@ -604,6 +609,7 @@ export default function DashboardPage() {
                       >
                         FEFO Allocate
                       </button>
+                      )}
                     </td>
                   </tr>
                 ))}

@@ -192,7 +192,8 @@ export default function RequisitionsPage() {
               <tr><td colSpan="7" style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>No blood requisitions matching filters</td></tr>
             ) : (
               requests.map((r) => {
-                const isPending = ['PENDING', 'APPROVED', 'PARTIAL'].includes(r.status);
+                const isFulfilled = r.status === 'FULFILLED' || ((r.units_allocated || 0) >= r.units_needed && r.units_needed > 0);
+                const isPending = ['PENDING', 'APPROVED', 'PARTIAL'].includes(r.status) && !isFulfilled;
                 return (
                   <tr key={r.request_id} style={{ borderBottom: '1px solid var(--border-light)' }}>
                     <td style={{ padding: '14px 16px', fontWeight: '700', color: 'var(--primary)' }}>
@@ -227,14 +228,27 @@ export default function RequisitionsPage() {
                         fontWeight: '700',
                         padding: '3px 10px',
                         borderRadius: '12px',
-                        backgroundColor: r.status === 'FULFILLED' ? '#e8f5ec' : isPending ? '#eaf4ff' : '#fbebee',
-                        color: r.status === 'FULFILLED' ? 'var(--success)' : isPending ? 'var(--primary)' : 'var(--danger)'
+                        backgroundColor: isFulfilled ? '#e8f5ec' : isPending ? '#eaf4ff' : '#fbebee',
+                        color: isFulfilled ? 'var(--success)' : isPending ? 'var(--primary)' : 'var(--danger)'
                       }}>
-                        {r.status}
+                        {isFulfilled ? 'FULFILLED' : r.status}
                       </span>
                     </td>
                     <td style={{ padding: '14px 16px', textAlign: 'right' }}>
                       <div style={{ display: 'inline-flex', gap: '8px' }}>
+                        {isFulfilled && (
+                          <span style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            color: 'var(--success)',
+                            fontWeight: '700',
+                            fontSize: '12px'
+                          }}>
+                            <CheckCircle2 size={14} />
+                            Allocated
+                          </span>
+                        )}
                         {canAllocate && isPending && (
                           <button
                             onClick={() => handleAllocate(r.request_id)}

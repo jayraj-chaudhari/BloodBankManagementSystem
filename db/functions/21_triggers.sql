@@ -8,14 +8,14 @@
 \pset pager off
 
 -- Gap between donations in days (single place to change the rule)
-CREATE FUNCTION fn_donation_gap_days(p_gender character)
+CREATE OR REPLACE FUNCTION fn_donation_gap_days(p_gender character)
 RETURNS int LANGUAGE sql IMMUTABLE
 AS $$ SELECT CASE WHEN p_gender = 'F' THEN 120 ELSE 90 END $$;
 
-CREATE SEQUENCE unit_code_seq;
+CREATE SEQUENCE IF NOT EXISTS unit_code_seq;
 
 -- 1) Donor age (18-65) ------------------------------------------------
-CREATE FUNCTION tf_donor_age_check() RETURNS trigger
+CREATE OR REPLACE FUNCTION tf_donor_age_check() RETURNS trigger
 LANGUAGE plpgsql
 AS $$
 DECLARE
@@ -28,12 +28,14 @@ BEGIN
     RETURN NEW;
 END
 $$;
+
+DROP TRIGGER IF EXISTS trg_donor_age_check ON donor;
 CREATE TRIGGER trg_donor_age_check
     BEFORE INSERT OR UPDATE OF date_of_birth ON donor
     FOR EACH ROW EXECUTE FUNCTION tf_donor_age_check();
 
 -- 2) Donation: age at donation + minimum gap (both directions) ----------
-CREATE FUNCTION tf_donation_checks() RETURNS trigger
+CREATE OR REPLACE FUNCTION tf_donation_checks() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public
 AS $$
 DECLARE
@@ -74,12 +76,14 @@ BEGIN
     RETURN NEW;
 END
 $$;
+
+DROP TRIGGER IF EXISTS trg_donation_gap_check ON donation;
 CREATE TRIGGER trg_donation_gap_check
     BEFORE INSERT ON donation
     FOR EACH ROW EXECUTE FUNCTION tf_donation_checks();
 
 -- 3) Unit: expiry date + bag code ------------------------------------
-CREATE FUNCTION tf_unit_set_expiry() RETURNS trigger
+CREATE OR REPLACE FUNCTION tf_unit_set_expiry() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public
 AS $$
 DECLARE
@@ -109,12 +113,14 @@ BEGIN
     RETURN NEW;
 END
 $$;
+
+DROP TRIGGER IF EXISTS trg_unit_set_expiry ON blood_unit;
 CREATE TRIGGER trg_unit_set_expiry
     BEFORE INSERT ON blood_unit
     FOR EACH ROW EXECUTE FUNCTION tf_unit_set_expiry();
 
 -- 4) Unit status: allowed transitions only -----------------------------
-CREATE FUNCTION tf_unit_status_guard() RETURNS trigger
+CREATE OR REPLACE FUNCTION tf_unit_status_guard() RETURNS trigger
 LANGUAGE plpgsql
 AS $$
 BEGIN
@@ -129,13 +135,15 @@ BEGIN
     RETURN NEW;
 END
 $$;
+
+DROP TRIGGER IF EXISTS trg_unit_status_guard ON blood_unit;
 CREATE TRIGGER trg_unit_status_guard
     BEFORE UPDATE OF status ON blood_unit
     FOR EACH ROW WHEN (OLD.status IS DISTINCT FROM NEW.status)
     EXECUTE FUNCTION tf_unit_status_guard();
 
 -- 5) Unit status change -> stock ledger row ----------------------------
-CREATE FUNCTION tf_unit_status_movement() RETURNS trigger
+CREATE OR REPLACE FUNCTION tf_unit_status_movement() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public
 AS $$
 DECLARE
@@ -168,12 +176,14 @@ BEGIN
     RETURN NULL;
 END
 $$;
+
+DROP TRIGGER IF EXISTS trg_unit_status_movement ON blood_unit;
 CREATE TRIGGER trg_unit_status_movement
     AFTER INSERT OR UPDATE OF status ON blood_unit
     FOR EACH ROW EXECUTE FUNCTION tf_unit_status_movement();
 
 -- 6) Screening result -> unit status -----------------------------------
-CREATE FUNCTION tf_screening_update_units() RETURNS trigger
+CREATE OR REPLACE FUNCTION tf_screening_update_units() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public
 AS $$
 DECLARE
@@ -197,12 +207,14 @@ BEGIN
     RETURN NULL;
 END
 $$;
+
+DROP TRIGGER IF EXISTS trg_screening_update_units ON screening_result;
 CREATE TRIGGER trg_screening_update_units
     AFTER INSERT OR UPDATE OF result ON screening_result
     FOR EACH ROW EXECUTE FUNCTION tf_screening_update_units();
 
 -- 7) Allocation: validate, then apply ------------------------------------
-CREATE FUNCTION tf_allocation_validate() RETURNS trigger
+CREATE OR REPLACE FUNCTION tf_allocation_validate() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public
 AS $$
 DECLARE
@@ -257,11 +269,13 @@ BEGIN
     RETURN NEW;
 END
 $$;
+
+DROP TRIGGER IF EXISTS trg_allocation_validate ON request_allocation;
 CREATE TRIGGER trg_allocation_validate
     BEFORE INSERT ON request_allocation
     FOR EACH ROW EXECUTE FUNCTION tf_allocation_validate();
 
-CREATE FUNCTION tf_allocation_apply() RETURNS trigger
+CREATE OR REPLACE FUNCTION tf_allocation_apply() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public
 AS $$
 DECLARE
@@ -279,12 +293,14 @@ BEGIN
     RETURN NULL;
 END
 $$;
+
+DROP TRIGGER IF EXISTS trg_allocation_apply ON request_allocation;
 CREATE TRIGGER trg_allocation_apply
     AFTER INSERT ON request_allocation
     FOR EACH ROW EXECUTE FUNCTION tf_allocation_apply();
 
 -- 8) updated_at maintenance ----------------------------------------------
-CREATE FUNCTION tf_touch_updated_at() RETURNS trigger
+CREATE OR REPLACE FUNCTION tf_touch_updated_at() RETURNS trigger
 LANGUAGE plpgsql
 AS $$
 BEGIN
@@ -292,9 +308,13 @@ BEGIN
     RETURN NEW;
 END
 $$;
+
+DROP TRIGGER IF EXISTS trg_request_updated_at ON blood_request;
 CREATE TRIGGER trg_request_updated_at
     BEFORE UPDATE ON blood_request
     FOR EACH ROW EXECUTE FUNCTION tf_touch_updated_at();
+
+DROP TRIGGER IF EXISTS trg_donor_contact_updated_at ON donor_contact;
 CREATE TRIGGER trg_donor_contact_updated_at
     BEFORE UPDATE ON donor_contact
     FOR EACH ROW EXECUTE FUNCTION tf_touch_updated_at();

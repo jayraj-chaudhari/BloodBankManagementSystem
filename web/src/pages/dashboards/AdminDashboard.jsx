@@ -50,7 +50,8 @@ export default function AdminDashboard() {
     region_code: 'SUR',
     phone: '9876543210',
     latitude: 21.1702,
-    longitude: 72.8311
+    longitude: 72.8311,
+    is_verified: true
   });
 
   const loadData = async () => {
@@ -121,21 +122,42 @@ export default function AdminDashboard() {
         region_code: hospitalForm.region_code,
         phone: hospitalForm.phone,
         latitude: Number(hospitalForm.latitude),
-        longitude: Number(hospitalForm.longitude)
+        longitude: Number(hospitalForm.longitude),
+        is_verified: Boolean(hospitalForm.is_verified)
       });
 
-      toast.success(`Hospital "${hospitalForm.hospital_name}" registered! Listed as unverified under Discretionary Access Control.`, 'Hospital Added');
+      toast.success(
+        `Hospital "${hospitalForm.hospital_name}" registered successfully (${hospitalForm.is_verified ? 'VERIFIED' : 'PENDING VERIFICATION'})!`,
+        'Hospital Registered'
+      );
       setShowHospitalModal(false);
       setHospitalForm({
         hospital_name: '',
         region_code: 'SUR',
         phone: '9876543210',
         latitude: 21.1702,
-        longitude: 72.8311
+        longitude: 72.8311,
+        is_verified: true
       });
       loadData();
     } catch (err) {
       toast.error(err.message || 'Hospital registration failed', 'DAC Error');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleVerifyHospital = async (hospitalId, status) => {
+    try {
+      setActionLoading(true);
+      await masterApi.verifyHospital(hospitalId, status);
+      toast.success(
+        status ? `Hospital #${hospitalId} verified successfully!` : `Hospital #${hospitalId} marked as unverified.`,
+        'Verification Updated'
+      );
+      loadData();
+    } catch (err) {
+      toast.error(err.message || 'Failed to update hospital verification status', 'Verification Error');
     } finally {
       setActionLoading(false);
     }
@@ -463,13 +485,14 @@ export default function AdminDashboard() {
                   <th style={{ padding: '12px 14px' }}>Contact Phone</th>
                   <th style={{ padding: '12px 14px' }}>Verification Status</th>
                   <th style={{ padding: '12px 14px' }}>Registered At</th>
+                  <th style={{ padding: '12px 14px', textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan="6" style={{ textAlign: 'center', padding: '30px' }}>Loading hospital network...</td></tr>
+                  <tr><td colSpan="7" style={{ textAlign: 'center', padding: '30px' }}>Loading hospital network...</td></tr>
                 ) : hospitals.length === 0 ? (
-                  <tr><td colSpan="6" style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>No hospitals registered yet</td></tr>
+                  <tr><td colSpan="7" style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>No hospitals registered yet</td></tr>
                 ) : (
                   hospitals.map((h) => (
                     <tr key={h.hospital_id} style={{ borderBottom: '1px solid var(--border-light)' }}>
@@ -495,6 +518,52 @@ export default function AdminDashboard() {
                       </td>
                       <td style={{ padding: '12px 14px', color: 'var(--text-muted)', fontSize: '12px' }}>
                         {new Date(h.created_at).toLocaleDateString()}
+                      </td>
+                      <td style={{ padding: '12px 14px', textAlign: 'right' }}>
+                        {h.is_verified ? (
+                          <button
+                            type="button"
+                            onClick={() => handleVerifyHospital(h.hospital_id, false)}
+                            disabled={actionLoading}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              padding: '5px 10px',
+                              borderRadius: '6px',
+                              fontSize: '11px',
+                              fontWeight: '700',
+                              border: '1px solid #fca5a5',
+                              backgroundColor: '#fff1f2',
+                              color: '#b91c1c',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            <XCircle size={12} /> Revoke
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleVerifyHospital(h.hospital_id, true)}
+                            disabled={actionLoading}
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              padding: '5px 12px',
+                              borderRadius: '6px',
+                              fontSize: '11px',
+                              fontWeight: '700',
+                              border: 'none',
+                              backgroundColor: '#10b981',
+                              color: '#ffffff',
+                              cursor: 'pointer',
+                              boxShadow: '0 1px 3px rgba(16, 185, 129, 0.3)'
+                            }}
+                          >
+                            <CheckCircle2 size={12} /> Verify Now
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))
@@ -687,6 +756,19 @@ export default function AdminDashboard() {
                 style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)', marginTop: '4px' }}
               />
             </div>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 14px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid var(--border)' }}>
+            <input
+              type="checkbox"
+              id="hosp_is_verified"
+              checked={hospitalForm.is_verified}
+              onChange={(e) => setHospitalForm({ ...hospitalForm, is_verified: e.target.checked })}
+              style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+            />
+            <label htmlFor="hosp_is_verified" style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-main)', cursor: 'pointer' }}>
+              Mark as Verified immediately (Bypass manual verification queue)
+            </label>
           </div>
 
           <button

@@ -51,7 +51,7 @@ router.get('/', authenticate, async (req, res, next) => {
 // POST /api/v1/hospitals (admin only - DAC enforced by Postgres)
 router.post('/', authenticate, async (req, res, next) => {
   try {
-    const { hospital_name, region_code, phone, address, latitude, longitude } = req.body;
+    const { hospital_name, region_code, phone, address, latitude, longitude, is_verified } = req.body;
 
     if (!hospital_name || !region_code || !phone) {
       return res.status(400).json({
@@ -62,16 +62,19 @@ router.post('/', authenticate, async (req, res, next) => {
       });
     }
 
+    const verifiedFlag = Boolean(is_verified);
+
     const row = await withContext(req.user, async (client) => {
       const q = `
         INSERT INTO hospital (hospital_name, region_code, phone, is_verified, latitude, longitude)
-        VALUES ($1, upper($2), $3, false, $4, $5)
+        VALUES ($1, upper($2), $3, $4, $5, $6)
         RETURNING hospital_id, hospital_name, region_code, phone, is_verified, created_at
       `;
       const resQuery = await client.query(q, [
         hospital_name.trim(),
         region_code.trim(),
         phone.trim(),
+        verifiedFlag,
         latitude || null,
         longitude || null
       ]);
@@ -81,11 +84,57 @@ router.post('/', authenticate, async (req, res, next) => {
     await audit(req, 'REQUEST_CREATED', 'hospital', row.hospital_id, {
       hospital_name: row.hospital_name,
       region_code: row.region_code,
-      is_verified: false
+      is_verified: verifiedFlag
     });
 
     return res.status(201).json({
       data: row
+    });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// PATCH /api/v1/hospitals/:hospital_id/verify (admin only)
+router.patch('/:hospital_id/verify', authenticate, authorizeRoles('admin'), async (req, res, next) => {
+  try {
+    const hospitalId = parseInt(req.params.hospital_id, 10);
+    if (isNaN(hospitalId)) {
+      return res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Invalid hospital_id parameter'
+        }
+      });
+    }
+
+    const isVerified = req.body.is_verified !== undefined ? Boolean(req.body.is_verified) : true;
+
+    const row = await withContext(req.user, async (client) => {
+      const q = `
+        UPDATE hospital
+           SET is_verified = $1
+         WHERE hospital_id = $2
+        RETURNING hospital_id, hospital_name, region_code, phone, is_verified, created_at
+      `;
+      const resQuery = await client.query(q, [isVerified, hospitalId]);
+      if (resQuery.rows.length === 0) {
+        const error = new Error('Hospital not found');
+        error.status = 404;
+        error.code = 'NOT_FOUND';
+        throw error;
+      }
+      return resQuery.rows[0];
+    });
+
+    await audit(req, isVerified ? 'HOSPITAL_VERIFIED' : 'HOSPITAL_UNVERIFIED', 'hospital', hospitalId, {
+      hospital_name: row.hospital_name,
+      is_verified: isVerified
+    });
+
+    return res.status(200).json({
+      data: row,
+      message: `Hospital #${hospitalId} verification status set to ${isVerified ? 'VERIFIED' : 'UNVERIFIED'}`
     });
   } catch (err) {
     next(err);

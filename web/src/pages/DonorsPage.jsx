@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Eye, EyeOff, ShieldAlert, CheckCircle2, XCircle, Search, Filter } from 'lucide-react';
+import { Users, Eye, EyeOff, ShieldAlert, CheckCircle2, XCircle, Search, Filter, RotateCcw } from 'lucide-react';
 import { donorApi } from '../services/api';
 import { useToast } from '../context/ToastContext';
 import Modal from '../components/common/Modal';
@@ -20,7 +20,7 @@ export default function DonorsPage() {
   const loadDonors = async () => {
     try {
       setLoading(true);
-      const params = {};
+      const params = { limit: 100 };
       if (bloodGroupFilter) params.blood_group = bloodGroupFilter;
       if (regionFilter) params.region_code = regionFilter;
       if (eligibleOnly) params.eligible = 'true';
@@ -38,6 +38,13 @@ export default function DonorsPage() {
     loadDonors();
   }, [bloodGroupFilter, regionFilter, eligibleOnly]);
 
+  const handleResetFilters = () => {
+    setBloodGroupFilter('');
+    setRegionFilter('');
+    setEligibleOnly(false);
+    setSearch('');
+  };
+
   const handleRevealContact = async (donorId) => {
     try {
       setContactLoading(true);
@@ -50,10 +57,27 @@ export default function DonorsPage() {
     }
   };
 
-  const filtered = donors.filter(d =>
-    d.full_name?.toLowerCase().includes(search.toLowerCase()) ||
-    d.email?.toLowerCase().includes(search.toLowerCase())
-  );
+  const regionNames = {
+    SUR: 'Surat',
+    AHM: 'Ahmedabad',
+    VAD: 'Vadodara',
+    RAJ: 'Rajkot'
+  };
+
+  const filtered = donors.filter(d => {
+    const term = search.trim().toLowerCase();
+    if (!term) return true;
+    const regionFullName = regionNames[d.region_code] || '';
+    return (
+      d.full_name?.toLowerCase().includes(term) ||
+      d.email?.toLowerCase().includes(term) ||
+      String(d.donor_id).includes(term) ||
+      `#${d.donor_id}`.includes(term) ||
+      d.blood_group?.toLowerCase().includes(term) ||
+      d.region_code?.toLowerCase().includes(term) ||
+      regionFullName.toLowerCase().includes(term)
+    );
+  });
 
   return (
     <div>
@@ -110,7 +134,58 @@ export default function DonorsPage() {
           />
           Eligible to Donate Today (90d/120d gap)
         </label>
+
+        {(bloodGroupFilter || regionFilter || eligibleOnly || search) && (
+          <button
+            onClick={handleResetFilters}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '8px 12px',
+              borderRadius: '8px',
+              fontSize: '12px',
+              fontWeight: '700',
+              border: '1px solid #e2e8f0',
+              backgroundColor: '#ffffff',
+              color: 'var(--text-muted)',
+              cursor: 'pointer'
+            }}
+          >
+            <RotateCcw size={13} /> Reset Filters
+          </button>
+        )}
       </div>
+
+      {/* Active filter summary tag */}
+      {(bloodGroupFilter || regionFilter || eligibleOnly || search) && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', fontSize: '12px', color: 'var(--text-muted)' }}>
+          <span style={{ fontWeight: '700' }}>Active Filters:</span>
+          {bloodGroupFilter && (
+            <span style={{ padding: '2px 8px', borderRadius: '4px', backgroundColor: '#e0f2fe', color: '#0369a1', fontWeight: '700' }}>
+              Group: {bloodGroupFilter}
+            </span>
+          )}
+          {regionFilter && (
+            <span style={{ padding: '2px 8px', borderRadius: '4px', backgroundColor: '#e0f2fe', color: '#0369a1', fontWeight: '700' }}>
+              Region: {regionFilter} ({regionNames[regionFilter]})
+            </span>
+          )}
+          {eligibleOnly && (
+            <span style={{ padding: '2px 8px', borderRadius: '4px', backgroundColor: '#dcfce7', color: '#15803d', fontWeight: '700' }}>
+              Eligible Only
+            </span>
+          )}
+          {search && (
+            <span style={{ padding: '2px 8px', borderRadius: '4px', backgroundColor: '#f1f5f9', color: '#475569', fontWeight: '700' }}>
+              Search: "{search}"
+            </span>
+          )}
+          <span style={{ marginLeft: 'auto', fontWeight: '600' }}>
+            Showing {filtered.length} donor(s)
+          </span>
+        </div>
+      )}
 
       {/* Donors Table */}
       <div className="hope-card" style={{ padding: '24px' }}>
@@ -155,7 +230,7 @@ export default function DonorsPage() {
                     </span>
                   </td>
                   <td style={{ padding: '14px 16px' }}>
-                    {d.is_eligible !== false ? (
+                    {Boolean(d.is_eligible) ? (
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: '700', color: 'var(--success)', backgroundColor: '#e8f5ec', padding: '3px 8px', borderRadius: '12px' }}>
                         <CheckCircle2 size={12} /> Eligible
                       </span>

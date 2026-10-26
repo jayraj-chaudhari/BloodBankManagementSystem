@@ -92,8 +92,9 @@ export default function HospitalDashboard() {
 
   // Stats calculation
   const totalOrders = requests.length;
-  const pendingOrders = requests.filter(r => r.status === 'PENDING').length;
-  const fulfilledOrders = requests.filter(r => r.status === 'FULFILLED' || r.status === 'ALLOCATED').length;
+  const isFulfilledOrder = (r) => r.status === 'FULFILLED' || r.status === 'ALLOCATED' || (r.units_allocated >= r.units_needed && r.units_needed > 0);
+  const pendingOrders = requests.filter(r => r.status === 'PENDING' && !isFulfilledOrder(r)).length;
+  const fulfilledOrders = requests.filter(isFulfilledOrder).length;
   const totalStockAvailable = publicInventory.reduce((acc, row) => acc + (row.units_available || 0), 0);
 
   return (
@@ -250,16 +251,16 @@ export default function HospitalDashboard() {
                           <span style={{
                             padding: '3px 8px',
                             borderRadius: '4px',
-                            backgroundColor: r.status === 'APPROVED' ? '#dcfce7' : r.status === 'CANCELLED' ? '#f3f4f6' : '#fef3c7',
-                            color: r.status === 'APPROVED' ? '#15803d' : r.status === 'CANCELLED' ? '#6b7280' : '#b45309',
+                            backgroundColor: isFulfilledOrder(r) || r.status === 'APPROVED' ? '#dcfce7' : r.status === 'CANCELLED' ? '#f3f4f6' : '#fef3c7',
+                            color: isFulfilledOrder(r) || r.status === 'APPROVED' ? '#15803d' : r.status === 'CANCELLED' ? '#6b7280' : '#b45309',
                             fontWeight: '700',
                             fontSize: '11px'
                           }}>
-                            {r.status}
+                            {isFulfilledOrder(r) ? 'FULFILLED' : r.status}
                           </span>
                         </td>
                         <td style={{ padding: '12px 8px' }}>
-                          {isPending && (
+                          {isPending && !isFulfilledOrder(r) && (
                             <button
                               onClick={() => handleCancelOrder(r.request_id)}
                               style={{

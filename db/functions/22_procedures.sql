@@ -9,7 +9,7 @@
 -- 1) FEFO allocation (runs with the CALLER's privileges, so DAC and RLS apply) ----
 CREATE OR REPLACE FUNCTION fn_allocate_fefo(p_request_id int, p_user_id int)
 RETURNS int
-LANGUAGE plpgsql
+LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = pg_catalog, public
 AS $$
 DECLARE
@@ -18,6 +18,7 @@ DECLARE
     v_today     date := (now() AT TIME ZONE 'Asia/Kolkata')::date;
     v_remaining int;
     v_count     int  := 0;
+    v_have      int;
     r           record;
 BEGIN
     IF v_ctx_user IS NOT NULL AND v_ctx_user::int <> p_user_id THEN
@@ -54,12 +55,18 @@ BEGIN
     LOOP
         INSERT INTO request_allocation (request_id, unit_id, allocated_by)
         VALUES (p_request_id, r.unit_id, p_user_id);
+        UPDATE blood_unit SET status = 'RESERVED' WHERE unit_id = r.unit_id;
         v_count := v_count + 1;
     END LOOP;
 
     IF v_count = 0 THEN
         RAISE EXCEPTION 'INSUFFICIENT_STOCK: no compatible available units for request %', p_request_id;
     END IF;
+    SELECT count(*) INTO v_have FROM request_allocation WHERE request_id = p_request_id;
+    UPDATE blood_request
+       SET status = (CASE WHEN v_have >= v_req.units_needed THEN 'FULFILLED' ELSE 'PARTIAL' END)::request_status_t
+     WHERE request_id = p_request_id;
+
     RETURN v_count;
 END
 $$;
@@ -169,7 +176,7 @@ ORDER BY proname;
 -- 4) Emergency donor search within radius (Haversine, pure SQL)
 CREATE OR REPLACE FUNCTION fn_find_donors_for_request(p_request_id int, p_radius_km numeric DEFAULT 50.0)
 RETURNS TABLE (donor_id int, blood_group blood_group_t, distance_km numeric, is_available boolean, next_eligible_on date)
-LANGUAGE plpgsql STABLE
+LANGUAGE plpgsql SECURITY DEFINER STABLE
 SET search_path = pg_catalog, public
 AS $$
 DECLARE

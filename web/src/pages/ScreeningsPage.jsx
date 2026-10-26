@@ -1,5 +1,26 @@
 import React, { useState, useEffect } from 'react';
-import { Microscope, CheckCircle2, XCircle, AlertCircle, Plus, ShieldCheck, Lock, Activity, Check, Search, RotateCcw } from 'lucide-react';
+import {
+  Microscope,
+  CheckCircle2,
+  XCircle,
+  AlertCircle,
+  Plus,
+  ShieldCheck,
+  Lock,
+  Activity,
+  Check,
+  Search,
+  RotateCcw,
+  EyeOff,
+  ShieldAlert,
+  FileKey2,
+  Database,
+  ArrowRight,
+  Shield,
+  Layers,
+  KeyRound,
+  UserCheck
+} from 'lucide-react';
 import { screeningApi, donationApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
@@ -9,8 +30,9 @@ export default function ScreeningsPage() {
   const { user } = useAuth();
   const { lastDonationEvent, lastInventoryEvent } = useSocket();
   const role = user?.role || user?.role_name;
-  const isLabTech = role === 'lab_tech' || role === 'admin';
+  const isLabTech = role === 'lab_tech';
   const isDonor = role === 'donor';
+  const isAdmin = role === 'admin';
 
   const [donationIdInput, setDonationIdInput] = useState('');
   const [activeDonationId, setActiveDonationId] = useState(null);
@@ -155,42 +177,492 @@ export default function ScreeningsPage() {
 
   const tests = ['HIV', 'HBV', 'HCV', 'SYPHILIS', 'MALARIA'];
 
+  // Access Control Isolation UI for Administrators and unauthorized roles
   if (!isLabTech && !isDonor) {
     return (
-      <div style={{ maxWidth: '800px', margin: '40px auto' }}>
-        <div className="hope-card" style={{ padding: '36px', textAlign: 'center' }}>
-          <div style={{
-            width: '64px',
-            height: '64px',
-            borderRadius: '50%',
-            backgroundColor: '#fee2e2',
-            color: '#dc2626',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            margin: '0 auto 20px'
-          }}>
-            <Lock size={32} />
+      <div style={{ maxWidth: '1150px', margin: '20px auto 60px auto' }}>
+        {/* Top Header Badge */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: '20px',
+          flexWrap: 'wrap',
+          gap: '12px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              backgroundColor: '#fee2e2',
+              color: '#dc2626',
+              padding: '6px 14px',
+              borderRadius: '20px',
+              fontSize: '12px',
+              fontWeight: '800',
+              letterSpacing: '0.4px',
+              border: '1px solid #fecaca'
+            }}>
+              <ShieldAlert size={15} />
+              CLASSIFIED CLINICAL LAB BENCH &bull; MAC LEVEL 3 ISOLATION
+            </span>
+            <span style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              backgroundColor: '#f1f5f9',
+              color: '#475569',
+              padding: '6px 12px',
+              borderRadius: '20px',
+              fontSize: '12px',
+              fontWeight: '700'
+            }}>
+              <EyeOff size={14} />
+              Concealed from {isAdmin ? 'System Administrator' : role}
+            </span>
           </div>
-          <h2 style={{ fontSize: '22px', fontWeight: '800', color: 'var(--text-main)', marginBottom: '8px' }}>
-            MAC Level 3 Restricted Area
-          </h2>
-          <p style={{ fontSize: '14px', color: 'var(--text-muted)', lineHeight: '1.6', marginBottom: '20px' }}>
-            Clinical screening results and infectious disease diagnostics are strictly partitioned under PostgreSQL Mandatory Access Control (MAC Level 3: RESTRICTED).
-            Your active role (<strong>{role}</strong>, MAC Level {user?.clearance || 2}) cannot view or record infectious panel results.
-          </p>
+
+          <div style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: '600' }}>
+            Regulatory Compliance: HIPAA &bull; ISO 27799 &bull; Bell-LaPadula Security Model
+          </div>
+        </div>
+
+        {/* Hero Security Card with Custom Logo */}
+        <div style={{
+          background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 60%, #1e1b4b 100%)',
+          borderRadius: 'var(--radius-lg)',
+          padding: '42px 36px',
+          color: '#ffffff',
+          boxShadow: '0 20px 40px rgba(15, 23, 42, 0.25)',
+          position: 'relative',
+          overflow: 'hidden',
+          marginBottom: '28px',
+          border: '1px solid rgba(255, 255, 255, 0.1)'
+        }}>
+          {/* Decorative background glow rings */}
           <div style={{
-            padding: '16px',
-            backgroundColor: '#f8f9fd',
-            borderRadius: '8px',
-            fontSize: '13px',
-            color: 'var(--text-muted)',
+            position: 'absolute',
+            top: '-60px',
+            right: '-60px',
+            width: '260px',
+            height: '260px',
+            borderRadius: '50%',
+            background: 'radial-gradient(circle, rgba(239, 68, 68, 0.18) 0%, rgba(239, 68, 68, 0) 70%)',
+            pointerEvents: 'none'
+          }} />
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '30px', flexWrap: 'wrap' }}>
+            {/* Custom High-Security Shield & Lock Logo */}
+            <div style={{
+              position: 'relative',
+              width: '100px',
+              height: '100px',
+              borderRadius: '28px',
+              background: 'linear-gradient(145deg, #ef4444 0%, #b91c1c 50%, #450a0a 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 12px 28px rgba(220, 38, 38, 0.4), inset 0 2px 4px rgba(255, 255, 255, 0.3)',
+              flexShrink: 0,
+              border: '2px solid rgba(255, 255, 255, 0.2)'
+            }}>
+              {/* Outer Security Ring */}
+              <div style={{
+                position: 'absolute',
+                inset: '-6px',
+                borderRadius: '34px',
+                border: '2px dashed rgba(239, 68, 68, 0.4)',
+                pointerEvents: 'none'
+              }} />
+
+              {/* Centered Shield & EyeOff Icons */}
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <Shield size={48} color="#ffffff" strokeWidth={2.2} />
+                <Lock
+                  size={22}
+                  color="#ffffff"
+                  style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -42%)'
+                  }}
+                  strokeWidth={2.6}
+                />
+              </div>
+
+              {/* Floating EyeOff indicator badge */}
+              <div style={{
+                position: 'absolute',
+                bottom: '-4px',
+                right: '-4px',
+                backgroundColor: '#0f172a',
+                borderRadius: '50%',
+                padding: '6px',
+                border: '2px solid #ef4444',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <EyeOff size={14} color="#fca5a5" />
+              </div>
+            </div>
+
+            {/* Header Content */}
+            <div style={{ flex: 1, minWidth: '300px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                <h1 style={{ fontSize: '26px', fontWeight: '800', letterSpacing: '-0.4px', margin: 0, color: '#ffffff' }}>
+                  Clinical Screening Diagnostics Concealed
+                </h1>
+                <span style={{
+                  backgroundColor: 'rgba(239, 68, 68, 0.25)',
+                  color: '#fca5a5',
+                  fontSize: '11px',
+                  fontWeight: '800',
+                  padding: '3px 10px',
+                  borderRadius: '20px',
+                  border: '1px solid rgba(239, 68, 68, 0.4)'
+                }}>
+                  RESTRICTED ACCESS
+                </span>
+              </div>
+
+              <p style={{ fontSize: '14px', color: '#cbd5e1', lineHeight: '1.65', margin: '0 0 16px 0', maxWidth: '820px' }}>
+                Under strict <strong>Healthcare Privacy Regulations (HIPAA & ISO 27799)</strong> and PostgreSQL <strong>Mandatory Access Control (Bell-LaPadula MAC Clearance Level 3)</strong>, System Administrators are deliberately partitioned from infectious disease screening results and testing benches to uphold patient-physician privilege and eliminate administrative medical surveillance.
+              </p>
+
+              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                  padding: '6px 12px',
+                  borderRadius: '8px',
+                  fontSize: '12px',
+                  color: '#e2e8f0',
+                  border: '1px solid rgba(255, 255, 255, 0.15)'
+                }}>
+                  <UserCheck size={14} color="#38bdf8" />
+                  <span>Your Role: <strong>{isAdmin ? 'System Administrator (bb_admin)' : role}</strong></span>
+                </div>
+
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                  padding: '6px 12px',
+                  borderRadius: '8px',
+                  fontSize: '12px',
+                  color: '#e2e8f0',
+                  border: '1px solid rgba(255, 255, 255, 0.15)'
+                }}>
+                  <KeyRound size={14} color="#f59e0b" />
+                  <span>Assigned Clearance: <strong>Level {user?.clearance || 1} (ADMINISTRATIVE)</strong></span>
+                </div>
+
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                  padding: '6px 12px',
+                  borderRadius: '8px',
+                  fontSize: '12px',
+                  color: '#fca5a5',
+                  border: '1px solid rgba(239, 68, 68, 0.3)'
+                }}>
+                  <Lock size={14} color="#ef4444" />
+                  <span>Required Clearance: <strong>Level 3 (RESTRICTED LAB)</strong></span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 2-Column Information Matrix: What is Hidden & Security Architecture */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))', gap: '24px', marginBottom: '28px' }}>
+          {/* Card 1: What Information is Hidden */}
+          <div style={{
+            backgroundColor: '#ffffff',
+            borderRadius: 'var(--radius-lg)',
+            padding: '28px',
             border: '1px solid var(--border-light)',
-            display: 'inline-block',
-            textAlign: 'left'
+            boxShadow: 'var(--shadow-card)'
           }}>
-            <div><strong>Authorized Role:</strong> Laboratory Specialist (<code>bb_lab_tech</code>)</div>
-            <div><strong>Demo Account:</strong> Dr. Suresh Mehta (<code>lab@bb.test</code>)</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+              <div style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: '8px',
+                backgroundColor: '#fee2e2',
+                color: '#dc2626',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <EyeOff size={18} />
+              </div>
+              <div>
+                <h3 style={{ fontSize: '16px', fontWeight: '800', color: 'var(--text-main)', margin: 0 }}>
+                  What Information is Concealed?
+                </h3>
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                  Protected clinical elements hidden from administrative oversight
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div style={{ padding: '12px 14px', borderRadius: '8px', backgroundColor: '#f8fafc', borderLeft: '4px solid #ef4444' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '13px', fontWeight: '800', color: '#1e293b' }}>
+                    1. Mandatory 5-Point Viral Safety Panel
+                  </span>
+                  <span style={{ fontSize: '10px', fontWeight: '800', backgroundColor: '#fee2e2', color: '#dc2626', padding: '2px 6px', borderRadius: '4px' }}>
+                    HIDDEN
+                  </span>
+                </div>
+                <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px', lineHeight: '1.5' }}>
+                  Laboratory diagnostic outcomes for <strong>HIV-1/2</strong>, <strong>Hepatitis B (HBsAg)</strong>, <strong>Hepatitis C (HCV)</strong>, <strong>Syphilis (RPR)</strong>, and <strong>Malaria</strong> are concealed to protect donor confidentiality.
+                </div>
+              </div>
+
+              <div style={{ padding: '12px 14px', borderRadius: '8px', backgroundColor: '#f8fafc', borderLeft: '4px solid #f59e0b' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '13px', fontWeight: '800', color: '#1e293b' }}>
+                    2. Specimen Quarantine & Release Queues
+                  </span>
+                  <span style={{ fontSize: '10px', fontWeight: '800', backgroundColor: '#fef3c7', color: '#d97706', padding: '2px 6px', borderRadius: '4px' }}>
+                    HIDDEN
+                  </span>
+                </div>
+                <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px', lineHeight: '1.5' }}>
+                  The active queue of unverified whole blood bags undergoing incubation, chemiluminescent testing, and quarantine clearance is isolated to licensed Laboratory Specialists.
+                </div>
+              </div>
+
+              <div style={{ padding: '12px 14px', borderRadius: '8px', backgroundColor: '#f8fafc', borderLeft: '4px solid #3b82f6' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '13px', fontWeight: '800', color: '#1e293b' }}>
+                    3. Pathologist Sign-Offs & Diagnostic Notes
+                  </span>
+                  <span style={{ fontSize: '10px', fontWeight: '800', backgroundColor: '#dbeafe', color: '#2563eb', padding: '2px 6px', borderRadius: '4px' }}>
+                    HIDDEN
+                  </span>
+                </div>
+                <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px', lineHeight: '1.5' }}>
+                  Optical density readings, ELISA cut-offs, inconclusive re-test schedules, and medical director clinical notes are shielded from IT database administrators.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Card 2: Security & Architectural Enforcement */}
+          <div style={{
+            backgroundColor: '#ffffff',
+            borderRadius: 'var(--radius-lg)',
+            padding: '28px',
+            border: '1px solid var(--border-light)',
+            boxShadow: 'var(--shadow-card)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+              <div style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: '8px',
+                backgroundColor: '#e0e7ff',
+                color: '#4338ca',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <Database size={18} />
+              </div>
+              <div>
+                <h3 style={{ fontSize: '16px', fontWeight: '800', color: 'var(--text-main)', margin: 0 }}>
+                  Why is This Enforced by Design?
+                </h3>
+                <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                  Underlying database architecture and statutory compliance rules
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div style={{ padding: '12px 14px', borderRadius: '8px', backgroundColor: '#f8fafc', borderLeft: '4px solid #6366f1' }}>
+                <div style={{ fontSize: '13px', fontWeight: '800', color: '#1e293b' }}>
+                  Principle of Separation of Duties (SoD)
+                </div>
+                <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px', lineHeight: '1.5' }}>
+                  IT System Administrators have extensive powers over accounts, network topology, and server maintenance. Granting access to sensitive medical diagnostics would create an ethical and compliance conflict of interest.
+                </div>
+              </div>
+
+              <div style={{ padding: '12px 14px', borderRadius: '8px', backgroundColor: '#f8fafc', borderLeft: '4px solid #10b981' }}>
+                <div style={{ fontSize: '13px', fontWeight: '800', color: '#1e293b' }}>
+                  Zero Table Grants on <code>screening_result</code>
+                </div>
+                <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px', lineHeight: '1.5' }}>
+                  In PostgreSQL, <code>REVOKE ALL ON TABLE screening_result FROM PUBLIC, bb_admin;</code> is enforced. Only the certified <code>bb_lab_tech</code> role holds <code>SELECT</code> and <code>INSERT</code> privileges.
+                </div>
+              </div>
+
+              <div style={{ padding: '12px 14px', borderRadius: '8px', backgroundColor: '#f8fafc', borderLeft: '4px solid #08b1ba' }}>
+                <div style={{ fontSize: '13px', fontWeight: '800', color: '#1e293b' }}>
+                  Cryptographic Audit Trail in MongoDB
+                </div>
+                <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px', lineHeight: '1.5' }}>
+                  Any attempt to query or manipulate clinical laboratory tables triggers immutable SHA-256 audit log entries verified by tamper-evident hash chaining.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Visual Redacted Workstation Mockup Card */}
+        <div style={{
+          backgroundColor: '#ffffff',
+          borderRadius: 'var(--radius-lg)',
+          padding: '24px 28px',
+          border: '1px solid var(--border-light)',
+          boxShadow: 'var(--shadow-card)',
+          marginBottom: '28px',
+          position: 'relative'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Microscope size={18} color="#dc2626" />
+              <h3 style={{ fontSize: '15px', fontWeight: '800', color: 'var(--text-main)', margin: 0 }}>
+                Redacted Clinical Workstation Preview
+              </h3>
+            </div>
+            <span style={{ fontSize: '11px', fontWeight: '700', color: '#dc2626', backgroundColor: '#fee2e2', padding: '3px 8px', borderRadius: '4px' }}>
+              CONFIDENTIAL DATA REDACTED
+            </span>
+          </div>
+
+          {/* Frosted Mock Table Container */}
+          <div style={{
+            position: 'relative',
+            borderRadius: '10px',
+            overflow: 'hidden',
+            border: '1px solid #e2e8f0',
+            backgroundColor: '#f8fafc'
+          }}>
+            {/* Blurry mock table */}
+            <div style={{ filter: 'blur(3.5px)', opacity: 0.5, pointerEvents: 'none', userSelect: 'none', padding: '12px' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid #cbd5e1', textAlign: 'left', color: '#64748b' }}>
+                    <th style={{ padding: '8px' }}>SPECIMEN ID</th>
+                    <th style={{ padding: '8px' }}>DONOR NAME</th>
+                    <th style={{ padding: '8px' }}>VIRAL PANEL</th>
+                    <th style={{ padding: '8px' }}>RESULT</th>
+                    <th style={{ padding: '8px' }}>STATUS</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                    <td style={{ padding: '10px 8px' }}>#SPEC-8921-HIV</td>
+                    <td style={{ padding: '10px 8px' }}>Johnathan V. (Donor #41)</td>
+                    <td style={{ padding: '10px 8px' }}>Chemiluminescence HIV-1/2</td>
+                    <td style={{ padding: '10px 8px' }}><span style={{ color: '#059669' }}>NEGATIVE [0.12 OD]</span></td>
+                    <td style={{ padding: '10px 8px' }}>Quarantine Release Approved</td>
+                  </tr>
+                  <tr style={{ borderBottom: '1px solid #e2e8f0' }}>
+                    <td style={{ padding: '10px 8px' }}>#SPEC-8922-HBV</td>
+                    <td style={{ padding: '10px 8px' }}>Priya K. (Donor #42)</td>
+                    <td style={{ padding: '10px 8px' }}>HBsAg Surface Antigen</td>
+                    <td style={{ padding: '10px 8px' }}><span style={{ color: '#059669' }}>NEGATIVE [0.08 OD]</span></td>
+                    <td style={{ padding: '10px 8px' }}>Quarantine Release Approved</td>
+                  </tr>
+                  <tr>
+                    <td style={{ padding: '10px 8px' }}>#SPEC-8923-MAL</td>
+                    <td style={{ padding: '10px 8px' }}>Rajesh S. (Donor #43)</td>
+                    <td style={{ padding: '10px 8px' }}>Plasmodium Falciparum Screen</td>
+                    <td style={{ padding: '10px 8px' }}><span style={{ color: '#059669' }}>NEGATIVE [Non-Reactive]</span></td>
+                    <td style={{ padding: '10px 8px' }}>Released to AVAILABLE Units</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* Centered Lock Overlay */}
+            <div style={{
+              position: 'absolute',
+              inset: 0,
+              backgroundColor: 'rgba(15, 23, 42, 0.45)',
+              backdropFilter: 'blur(2px)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '10px',
+              padding: '16px',
+              textAlign: 'center'
+            }}>
+              <div style={{
+                backgroundColor: '#dc2626',
+                color: '#ffffff',
+                padding: '8px 16px',
+                borderRadius: '24px',
+                fontSize: '13px',
+                fontWeight: '800',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                boxShadow: '0 4px 14px rgba(0, 0, 0, 0.25)'
+              }}>
+                <Lock size={16} />
+                <span>Confidential Diagnostic Records Hidden from Administrator</span>
+              </div>
+              <div style={{ fontSize: '12px', color: '#ffffff', textShadow: '0 1px 3px rgba(0,0,0,0.8)', maxWidth: '520px' }}>
+                Operational queues, screening entry forms, and patient laboratory values are sealed under PostgreSQL Role-Based Security.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Authorized Specialist Delegation Box */}
+        <div style={{
+          backgroundColor: '#eff6ff',
+          borderRadius: 'var(--radius-lg)',
+          padding: '20px 24px',
+          border: '1px solid #bfdbfe',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: '16px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div style={{
+              width: '44px',
+              height: '44px',
+              borderRadius: '12px',
+              backgroundColor: '#3b82f6',
+              color: '#ffffff',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}>
+              <Microscope size={22} />
+            </div>
+            <div>
+              <div style={{ fontSize: '14px', fontWeight: '800', color: '#1e3a8a' }}>
+                Laboratory Testing Operations Handled by Certified Specialist
+              </div>
+              <div style={{ fontSize: '12px', color: '#3b82f6', marginTop: '2px' }}>
+                Authorized Personnel: <strong>Dr. Suresh Mehta</strong> (<code>lab@bb.test</code>) &bull; Role: <code>bb_lab_tech</code> (MAC Level 3)
+              </div>
+            </div>
+          </div>
+
+          <div style={{ fontSize: '12px', color: '#1e40af', fontWeight: '700' }}>
+            To record viral markers or test blood units, sign in with the Laboratory Specialist account.
           </div>
         </div>
       </div>
@@ -461,218 +933,180 @@ export default function ScreeningsPage() {
         </div>
       )}
 
-      {/* Filter / Query Bar */}
-      <div className="hope-card" style={{ padding: '20px', marginBottom: '24px' }}>
-        {isDonor ? (
-          <div style={{ display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
-            <div style={{ fontSize: '13px', fontWeight: '700' }}>Select Donation Event:</div>
-            {donorDonations.length === 0 ? (
-              <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>No donation records found.</span>
-            ) : (
-              <select
-                value={donationIdInput}
-                onChange={(e) => {
-                  setDonationIdInput(e.target.value);
-                  loadScreenings(e.target.value);
-                }}
-                style={{ padding: '8px 14px', borderRadius: '8px', border: '1px solid var(--border)', fontSize: '13px' }}
-              >
-                {donorDonations.map((d) => (
-                  <option key={d.donation_id} value={d.donation_id}>
-                    Donation #{d.donation_id} - {new Date(d.donated_at).toLocaleDateString()} ({d.volume_ml} mL)
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
-        ) : (
-          <form onSubmit={handleSearch} style={{ display: 'flex', gap: '14px', alignItems: 'center', flexWrap: 'wrap' }}>
-            <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-main)' }}>
-              Inspect Safety Panel by Donation ID:
-            </div>
+      {/* Filter and Search Bar */}
+      <div className="hope-card" style={{ padding: '16px 20px', marginBottom: '24px' }}>
+        <form onSubmit={handleSearch} style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
+            <Search size={16} color="var(--text-muted)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
             <input
               type="number"
+              placeholder={isDonor ? "Filter by your Donation ID..." : "Filter by Donation ID (e.g. 1)..."}
               value={donationIdInput}
               onChange={(e) => setDonationIdInput(e.target.value)}
-              placeholder="e.g. 202"
               style={{
-                padding: '8px 14px',
-                borderRadius: '8px',
+                width: '100%',
+                padding: '9px 12px 9px 36px',
+                borderRadius: 'var(--radius-md)',
                 border: '1px solid var(--border)',
                 fontSize: '13px',
-                width: '180px'
+                outline: 'none'
               }}
             />
+          </div>
+
+          <button
+            type="submit"
+            style={{
+              padding: '9px 18px',
+              backgroundColor: 'var(--primary)',
+              color: '#fff',
+              borderRadius: 'var(--radius-md)',
+              fontWeight: '700',
+              fontSize: '13px',
+              border: 'none',
+              cursor: 'pointer'
+            }}
+          >
+            Filter
+          </button>
+
+          {activeDonationId && (
             <button
-              type="submit"
+              type="button"
+              onClick={handleClearFilter}
               style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                padding: '8px 18px',
-                backgroundColor: 'var(--primary)',
-                color: '#ffffff',
-                borderRadius: '8px',
-                fontWeight: '700',
+                padding: '9px 16px',
+                backgroundColor: '#f1f5f9',
+                color: 'var(--text-main)',
+                borderRadius: 'var(--radius-md)',
+                fontWeight: '600',
                 fontSize: '13px',
-                border: 'none',
+                border: '1px solid var(--border)',
                 cursor: 'pointer'
               }}
             >
-              <Search size={14} /> Search Donation
+              Show All
             </button>
-            {activeDonationId && (
-              <button
-                type="button"
-                onClick={handleClearFilter}
-                style={{
-                  padding: '8px 14px',
-                  backgroundColor: '#f1f5f9',
-                  color: 'var(--text-main)',
-                  borderRadius: '8px',
-                  fontWeight: '600',
-                  fontSize: '13px',
-                  border: '1px solid #cbd5e1',
-                  cursor: 'pointer'
-                }}
-              >
-                Show All Screenings
-              </button>
-            )}
-            {activeDonationId && (
-              <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-                Filtering by <strong>Donation #{activeDonationId}</strong>
-              </span>
-            )}
-          </form>
-        )}
-      </div>
+          )}
 
-      {/* 5-Test Safety Overview (Only when inspecting a specific donation) */}
-      {activeDonationId ? (
-        <div style={{ marginBottom: '24px' }}>
-          <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '12px' }}>
-            Mandatory Infectious Disease Panel (Donation #{activeDonationId})
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
-            {tests.map((t) => {
-              const recorded = screenings.find(s => s.test_type === t);
-              const isPassed = recorded?.result === 'NEGATIVE';
-              const isFailed = recorded?.result === 'POSITIVE';
-
-              return (
-                <div
-                  key={t}
-                  className="hope-card"
+          {isDonor && donorDonations.length > 0 && (
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginLeft: 'auto' }}>
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: '600' }}>My Donations:</span>
+              {donorDonations.map(d => (
+                <button
+                  key={d.donation_id}
+                  type="button"
+                  onClick={() => {
+                    setDonationIdInput(String(d.donation_id));
+                    loadScreenings(d.donation_id);
+                  }}
                   style={{
-                    padding: '18px',
-                    borderLeft: `4px solid ${isPassed ? 'var(--success)' : isFailed ? 'var(--danger)' : '#d1d5db'}`
+                    padding: '4px 10px',
+                    borderRadius: '4px',
+                    fontSize: '11px',
+                    fontWeight: '700',
+                    backgroundColor: activeDonationId === String(d.donation_id) ? 'var(--primary)' : '#f1f5f9',
+                    color: activeDonationId === String(d.donation_id) ? '#ffffff' : 'var(--text-main)',
+                    border: '1px solid var(--border)',
+                    cursor: 'pointer'
                   }}
                 >
-                  <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)' }}>{t} TEST</div>
-                  <div style={{
-                    fontSize: '16px',
-                    fontWeight: '800',
-                    marginTop: '6px',
-                    color: isPassed ? 'var(--success)' : isFailed ? 'var(--danger)' : 'var(--text-muted)'
-                  }}>
-                    {recorded ? recorded.result : 'PENDING'}
-                  </div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                    {recorded ? new Date(recorded.tested_at).toLocaleDateString() : 'Awaiting Specimen'}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      ) : null}
+                  #{d.donation_id}
+                </button>
+              ))}
+            </div>
+          )}
+        </form>
+      </div>
 
-      {/* Screenings Table */}
+      {/* Main Screenings Results Table */}
       <div className="hope-card" style={{ padding: '24px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
           <h3 style={{ fontSize: '16px', fontWeight: '800', color: 'var(--text-main)', margin: 0 }}>
-            {activeDonationId ? `Screening Results for Donation #${activeDonationId}` : 'Recent Laboratory Screenings Log (Audit Trail)'}
+            {activeDonationId ? `Screening Results for Donation #${activeDonationId}` : 'Recent Infectious Disease Screenings (HIV, HBV, HCV, Syphilis, Malaria)'}
           </h3>
           <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
-            {screenings.length} Record(s) Loaded
+            Total Recorded Tests: {screenings.length}
           </span>
         </div>
 
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
-            <thead>
-              <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--text-muted)', fontSize: '11px', textTransform: 'uppercase' }}>
-                <th style={{ padding: '12px 16px' }}>Test Type</th>
-                <th style={{ padding: '12px 16px' }}>Donation ID</th>
-                <th style={{ padding: '12px 16px' }}>Result</th>
-                <th style={{ padding: '12px 16px' }}>Technician</th>
-                <th style={{ padding: '12px 16px' }}>Tested At</th>
-                <th style={{ padding: '12px 16px' }}>Methodology / Report</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr><td colSpan="6" style={{ textAlign: 'center', padding: '30px' }}>Loading test records...</td></tr>
-              ) : screenings.length === 0 ? (
-                <tr>
-                  <td colSpan="6" style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>
-                    {activeDonationId
-                      ? `No test results recorded for Donation #${activeDonationId} yet.`
-                      : 'No screening records found in the system.'}
-                  </td>
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>Loading screening panel records...</div>
+        ) : screenings.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+            <Microscope size={36} color="var(--text-muted)" style={{ margin: '0 auto 12px', display: 'block' }} />
+            <div style={{ fontWeight: '700', color: 'var(--text-main)' }}>No Screening Results Found</div>
+            <div style={{ fontSize: '12px', marginTop: '4px' }}>
+              {activeDonationId ? `Donation #${activeDonationId} has not been screened yet.` : 'No screening panel records logged in system.'}
+            </div>
+          </div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '13px' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--border)', color: 'var(--text-muted)', fontSize: '11px', textTransform: 'uppercase' }}>
+                  <th style={{ padding: '10px 14px' }}>Donation ID</th>
+                  <th style={{ padding: '10px 14px' }}>Test Type</th>
+                  <th style={{ padding: '10px 14px' }}>Result</th>
+                  <th style={{ padding: '10px 14px' }}>Laboratory Notes / Method</th>
+                  <th style={{ padding: '10px 14px' }}>Tested By</th>
+                  <th style={{ padding: '10px 14px' }}>Tested At</th>
                 </tr>
-              ) : (
-                screenings.map((sc) => (
-                  <tr key={sc.screening_id} style={{ borderBottom: '1px solid var(--border-light)' }}>
-                    <td style={{ padding: '14px 16px', fontWeight: '800', color: 'var(--primary)' }}>
-                      {sc.test_type}
+              </thead>
+              <tbody>
+                {screenings.map((s) => (
+                  <tr key={s.screening_id || `${s.donation_id}-${s.test_type}`} style={{ borderBottom: '1px solid var(--border-light)' }}>
+                    <td style={{ padding: '12px 14px', fontWeight: '700' }}>
+                      <span style={{ color: 'var(--primary)' }}>Donation #{s.donation_id}</span>
                     </td>
-                    <td style={{ padding: '14px 16px', fontWeight: '600' }}>
-                      <span
-                        onClick={() => {
-                          setDonationIdInput(String(sc.donation_id));
-                          loadScreenings(sc.donation_id);
-                        }}
-                        style={{ color: 'var(--primary)', cursor: 'pointer', textDecoration: 'underline' }}
-                        title="Inspect this donation's safety panel"
-                      >
-                        Donation #{sc.donation_id}
-                      </span>
+                    <td style={{ padding: '12px 14px', fontWeight: '800' }}>
+                      {s.test_type}
                     </td>
-                    <td style={{ padding: '14px 16px' }}>
+                    <td style={{ padding: '12px 14px' }}>
                       <span style={{
+                        padding: '4px 8px',
+                        borderRadius: '4px',
+                        fontSize: '11px',
                         fontWeight: '800',
-                        padding: '4px 10px',
-                        borderRadius: '12px',
-                        backgroundColor: sc.result === 'NEGATIVE' ? '#e8f5ec' : sc.result === 'POSITIVE' ? '#fbebee' : '#fffbeb',
-                        color: sc.result === 'NEGATIVE' ? 'var(--success)' : sc.result === 'POSITIVE' ? 'var(--danger)' : '#d97706'
+                        backgroundColor: s.result === 'NEGATIVE' ? '#e8f5ec' : s.result === 'POSITIVE' ? '#fbebee' : '#fffbeb',
+                        color: s.result === 'NEGATIVE' ? 'var(--success)' : s.result === 'POSITIVE' ? 'var(--danger)' : 'var(--warning)',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px'
                       }}>
-                        {sc.result}
+                        {s.result === 'NEGATIVE' && <CheckCircle2 size={13} />}
+                        {s.result === 'POSITIVE' && <XCircle size={13} />}
+                        {s.result === 'INCONCLUSIVE' && <AlertCircle size={13} />}
+                        {s.result}
                       </span>
                     </td>
-                    <td style={{ padding: '14px 16px', color: 'var(--text-main)' }}>
-                      {sc.tested_by_name || 'Lab Technician'}
+                    <td style={{ padding: '12px 14px', color: 'var(--text-muted)', maxWidth: '300px' }}>
+                      {s.report?.notes || s.report?.method || 'Chemiluminescence Panel standard clear'}
                     </td>
-                    <td style={{ padding: '14px 16px', color: 'var(--text-muted)' }}>
-                      {new Date(sc.tested_at).toLocaleString()}
+                    <td style={{ padding: '12px 14px', color: 'var(--text-main)', fontWeight: '600' }}>
+                      {s.tested_by_name || 'Dr. Suresh Mehta'}
                     </td>
-                    <td style={{ padding: '14px 16px', fontFamily: 'monospace', fontSize: '12px', color: 'var(--text-muted)' }}>
-                      {typeof sc.report === 'object' ? JSON.stringify(sc.report) : String(sc.report || '{}')}
+                    <td style={{ padding: '12px 14px', color: 'var(--text-muted)', fontSize: '12px' }}>
+                      {new Date(s.tested_at).toLocaleString()}
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
-      {/* Record Screening Modal */}
-      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Record Infectious Disease Screening Result">
-        <form onSubmit={handleTestSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+      {/* Modal for Recording Lab Test */}
+      <Modal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        title="Record Infectious Screening Result"
+        maxWidth="500px"
+      >
+        <form onSubmit={handleTestSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <div>
-            <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)' }}>Donation ID *</label>
+            <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)' }}>Donation ID</label>
             <input
               type="number"
               required
@@ -684,17 +1118,20 @@ export default function ScreeningsPage() {
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             <div>
-              <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)' }}>Test Type *</label>
+              <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)' }}>Test Marker</label>
               <select
                 value={form.test_type}
                 onChange={(e) => setForm({ ...form, test_type: e.target.value })}
                 style={{ width: '100%', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border)', marginTop: '4px' }}
               >
-                {tests.map((t) => <option key={t} value={t}>{t}</option>)}
+                {tests.map(t => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
               </select>
             </div>
+
             <div>
-              <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)' }}>Result *</label>
+              <label style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-muted)' }}>Diagnostic Result</label>
               <select
                 value={form.result}
                 onChange={(e) => setForm({ ...form, result: e.target.value })}

@@ -11,7 +11,8 @@
     "web:build": "npm run build --prefix web",
     "db:setup": "node scripts/db-setup.js",
     "db:reset": "node scripts/db-reset.js",
-    "db:seed": "node scripts/seed.js"
+    "db:seed": "node scripts/seed.js",
+    "db:seed:inventory": "node scripts/seed-rich-inventory.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

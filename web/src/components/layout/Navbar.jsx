@@ -266,7 +266,7 @@ export default function Navbar({ onSearch }) {
                 {user?.full_name || 'User'}
               </div>
               <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--primary)' }}>
-                {getRoleDisplayName(user?.role)}
+                {user?.role === 'donor' && user?.donor_id ? `Donor #${user.donor_id}` : getRoleDisplayName(user?.role)}
               </div>
             </div>
 

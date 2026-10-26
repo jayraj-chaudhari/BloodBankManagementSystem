@@ -8,7 +8,7 @@ const { audit } = require('../services/auditService');
 const { emitInventoryUpdate } = require('../services/socketService');
 
 // POST /api/v1/screenings (lab_tech only)
-router.post('/', authenticate, authorizeRoles('lab_tech', 'admin'), validate(createScreeningSchema), async (req, res, next) => {
+router.post('/', authenticate, authorizeRoles('lab_tech'), validate(createScreeningSchema), async (req, res, next) => {
   try {
     const { donation_id, test_type, result, report } = req.body;
     const testedBy = req.user.user_id;
@@ -48,7 +48,7 @@ router.post('/', authenticate, authorizeRoles('lab_tech', 'admin'), validate(cre
 });
 
 // GET /api/v1/screenings/pending (lab_tech and admin only)
-router.get('/pending', authenticate, authorizeRoles('lab_tech', 'admin'), async (req, res, next) => {
+router.get('/pending', authenticate, authorizeRoles('lab_tech'), async (req, res, next) => {
   try {
     const rows = await withContext(req.user, async (client) => {
       const q = `
@@ -103,9 +103,18 @@ router.get('/pending', authenticate, authorizeRoles('lab_tech', 'admin'), async 
   }
 });
 
-// GET /api/v1/screenings (lab_tech, auditor, admin, donor [own])
+// GET /api/v1/screenings (lab_tech, auditor, donor [own])
 router.get('/', authenticate, async (req, res, next) => {
   try {
+    if (req.user.role === 'admin') {
+      return res.status(403).json({
+        error: {
+          code: 'FORBIDDEN',
+          message: 'Clinical screening results are isolated from administrators under Mandatory Access Control (MAC Level 3: RESTRICTED)'
+        }
+      });
+    }
+
     let { donation_id } = req.query;
     if (donation_id === '[object Object]' || donation_id === '') {
       donation_id = null;

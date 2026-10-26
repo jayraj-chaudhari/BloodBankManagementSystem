@@ -8,7 +8,11 @@ import {
   Clock,
   Radio,
   FileText,
-  UserCheck
+  UserCheck,
+  ShieldCheck,
+  Award,
+  Sparkles,
+  Shield
 } from 'lucide-react';
 import HeroBanner from '../../components/common/HeroBanner';
 import StatCard from '../../components/common/StatCard';
@@ -26,6 +30,10 @@ export default function DonorDashboard() {
   const [screenings, setScreenings] = useState([]);
   const [alerts, setAlerts] = useState([]);
   const [updatingAvailability, setUpdatingAvailability] = useState(false);
+
+  const donorId = donorProfile?.donor_id || user?.donor_id;
+  const donorName = user?.full_name || donorProfile?.full_name || 'Donor';
+  const bloodGroup = donorProfile?.blood_group || user?.blood_group || 'O+';
 
   const loadDonorData = async () => {
     try {
@@ -77,14 +85,15 @@ export default function DonorDashboard() {
   }, []);
 
   const handleToggleAvailability = async () => {
-    if (!donorProfile) return;
+    if (!donorProfile && !donorId) return;
     try {
       setUpdatingAvailability(true);
-      const newStatus = !donorProfile.is_available;
-      await donorApi.updateDonor(donorProfile.donor_id, {
+      const targetId = donorProfile?.donor_id || donorId;
+      const newStatus = !donorProfile?.is_available;
+      await donorApi.updateDonor(targetId, {
         is_available: newStatus
       });
-      setDonorProfile({ ...donorProfile, is_available: newStatus });
+      setDonorProfile(prev => ({ ...prev, is_available: newStatus }));
       toast.success(
         `Availability updated: you are now ${newStatus ? 'AVAILABLE for emergency contact' : 'OFFLINE'}`,
         'Donor Status'
@@ -110,11 +119,51 @@ export default function DonorDashboard() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      {/* Donor Banner */}
+      {/* Donor Banner with prominent Donor ID right next to donor's name */}
       <HeroBanner
-        title={`Welcome, ${user?.full_name || 'Donor'}!`}
-        subtitle="Thank you for being a registered blood donor. Track your donation intervals, medical eligibility status, and emergency dispatch alerts."
-        badgeText={`Blood Group: ${donorProfile?.blood_group || 'O+'} | Verified Donor`}
+        title={`Welcome, ${donorName}!`}
+        titleExtra={
+          donorId ? (
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                backgroundColor: '#ffffff',
+                color: '#1e3bb3',
+                fontSize: '13px',
+                fontWeight: '800',
+                padding: '4px 14px',
+                borderRadius: '20px',
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                letterSpacing: '0.4px',
+                border: '1px solid rgba(255, 255, 255, 0.8)'
+              }}
+              title="Permanent Medical Donor Identification"
+            >
+              <UserCheck size={16} color="#3a57e8" />
+              Donor ID: #{donorId}
+            </span>
+          ) : (
+            <span
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                backgroundColor: 'rgba(255, 255, 255, 0.22)',
+                color: '#ffffff',
+                fontSize: '12px',
+                fontWeight: '700',
+                padding: '3px 10px',
+                borderRadius: '20px'
+              }}
+            >
+              Donor ID: Resolving...
+            </span>
+          )
+        }
+        subtitle="Thank you for being a registered voluntary blood donor. Your unique Donor ID is shown right next to your name and verifies your permanent medical record."
+        badgeText={`Donor ID: #${donorId || '...'} | Blood Group: ${bloodGroup}`}
         actions={[
           {
             label: donorProfile?.is_available ? 'Set Unavailable' : 'Set Available to Donate',
@@ -124,6 +173,80 @@ export default function DonorDashboard() {
           }
         ]}
       />
+
+      {/* Permanent Donor Credential Strip */}
+      <div style={{
+        backgroundColor: '#ffffff',
+        borderRadius: 'var(--radius-lg)',
+        padding: '16px 24px',
+        border: '1px solid var(--border-light)',
+        boxShadow: 'var(--shadow-card)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        flexWrap: 'wrap',
+        gap: '16px'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+          <div style={{
+            width: '46px',
+            height: '46px',
+            borderRadius: '12px',
+            backgroundColor: '#eef2ff',
+            color: 'var(--primary)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
+            <ShieldCheck size={26} color="#3a57e8" />
+          </div>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '15px', fontWeight: '800', color: 'var(--text-main)' }}>
+                {donorName}
+              </span>
+              <span style={{
+                backgroundColor: '#3a57e8',
+                color: '#ffffff',
+                fontSize: '11px',
+                fontWeight: '800',
+                padding: '2px 8px',
+                borderRadius: '12px',
+                letterSpacing: '0.4px'
+              }}>
+                DONOR ID #{donorId || '...'}
+              </span>
+              <span style={{
+                backgroundColor: '#fee2e2',
+                color: '#dc2626',
+                fontSize: '11px',
+                fontWeight: '800',
+                padding: '2px 8px',
+                borderRadius: '12px'
+              }}>
+                {bloodGroup}
+              </span>
+            </div>
+            <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '2px' }}>
+              Permanent Registry Card &bull; Region: <strong>{donorProfile?.region_code || 'SUR'}</strong> &bull; Status: {donorProfile?.is_available ? '🟢 Active & Available' : '⚪ Standing By'}
+            </div>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{
+            fontSize: '12px',
+            padding: '6px 14px',
+            borderRadius: '8px',
+            backgroundColor: isEligible ? '#ecfdf5' : '#fffbeb',
+            color: isEligible ? '#059669' : '#b45309',
+            fontWeight: '700',
+            border: `1px solid ${isEligible ? '#a7f3d0' : '#fde68a'}`
+          }}>
+            {isEligible ? '✓ Ready for Next Donation' : '⏳ Cooling Interval Active'}
+          </div>
+        </div>
+      </div>
 
       {/* Metrics */}
       <div style={{

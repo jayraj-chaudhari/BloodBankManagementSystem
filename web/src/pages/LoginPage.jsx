@@ -77,12 +77,20 @@ export default function LoginPage() {
         longitude: regForm.longitude ? Number(regForm.longitude) : undefined
       };
 
-      await authApi.registerDonor(payload);
-      toast.success('Donor account registered successfully! Signing you in...', 'Registration Complete');
+      const regRes = await authApi.registerDonor(payload);
+      const newDonorId = regRes?.data?.donor_id || regRes?.donor_id;
+      toast.success(
+        newDonorId ? `Donor account registered! Your permanent Donor ID is #${newDonorId}. Signing you in...` : 'Donor account registered successfully! Signing you in...',
+        'Registration Complete'
+      );
 
       // Auto login newly registered donor
       const userData = await login(payload.email, payload.password);
-      toast.success(`Welcome to PulseNet, ${userData?.full_name || 'Donor'}!`, 'Signed In');
+      const resolvedDonorId = newDonorId || userData?.donor_id;
+      toast.success(
+        `Welcome to PulseNet, ${userData?.full_name || 'Donor'}!${resolvedDonorId ? ` (Donor ID: #${resolvedDonorId})` : ''}`,
+        'Signed In'
+      );
       navigate('/');
     } catch (err) {
       toast.error(err.message || 'Registration failed. Please check your details.', 'Registration Rejection');

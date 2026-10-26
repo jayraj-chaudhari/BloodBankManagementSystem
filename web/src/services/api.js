@@ -124,7 +124,8 @@ export const auditApi = {
 export const masterApi = {
   getBranches: (params) => api.get('/branches', { params }),
   getHospitals: (params) => api.get('/hospitals', { params }),
-  createHospital: (data) => api.post('/hospitals', data)
+  createHospital: (data) => api.post('/hospitals', data),
+  verifyHospital: (hospitalId, isVerified = true) => api.patch(`/hospitals/${hospitalId}/verify`, { is_verified: isVerified })
 };
 
 // 11. Admin APIs (Staff & System Management)

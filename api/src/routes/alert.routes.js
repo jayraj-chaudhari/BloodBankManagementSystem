@@ -37,13 +37,14 @@ router.get('/requests/:request_id/candidate-donors', authenticate, authorizeRole
       // 2. Query candidates using fn_distance_km Haversine calculation
       const donorRes = await client.query(`
         SELECT d.donor_id, u.full_name AS donor_name, d.blood_group, d.region_code,
-               d.is_available,
+               d.is_available, coalesce(v.is_eligible, false) AS is_eligible,
                round(fn_distance_km(h.latitude, h.longitude, d.latitude, d.longitude)::numeric, 2) AS distance_km,
                EXISTS (
                  SELECT 1 FROM donor_alert da WHERE da.request_id = $1 AND da.donor_id = d.donor_id
                ) AS already_alerted
           FROM donor d
           JOIN app_user u ON u.user_id = d.user_id
+     LEFT JOIN v_donor_eligibility v ON v.donor_id = d.donor_id
           CROSS JOIN (SELECT $2::numeric AS latitude, $3::numeric AS longitude) h
          WHERE d.is_available = true
            AND d.latitude IS NOT NULL AND d.longitude IS NOT NULL

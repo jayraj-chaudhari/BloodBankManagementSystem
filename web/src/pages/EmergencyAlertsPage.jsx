@@ -477,8 +477,8 @@ export default function EmergencyAlertsPage() {
                           {cd.distance_km} km
                         </td>
                         <td style={{ padding: '12px 14px' }}>
-                          <span style={{ fontSize: '11px', fontWeight: '700', color: 'var(--success)' }}>
-                            ● ELIGIBLE
+                          <span style={{ fontSize: '11px', fontWeight: '700', color: cd.is_eligible ? 'var(--success)' : 'var(--warning)' }}>
+                            ● {cd.is_eligible ? 'ELIGIBLE' : 'WAIT PERIOD'}
                           </span>
                         </td>
                         <td style={{ padding: '12px 14px' }}>

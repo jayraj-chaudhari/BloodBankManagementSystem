@@ -78,12 +78,15 @@ router.get('/', authenticate, authorizeRoles('bb_officer', 'admin', 'lab_tech'),
       const emailField = req.user.role === 'admin' ? 'u.email' : `'[CONCEALED BY DAC]' AS email`;
 
       if (eligible === 'true') {
-        extraWhere = ' AND (v.is_eligible = true OR v.is_eligible IS NULL)';
+        extraWhere = ' AND v.is_eligible = true';
+      } else if (eligible === 'false') {
+        extraWhere = ' AND (v.is_eligible = false OR v.is_eligible IS NULL)';
       }
 
         const countRes = await client.query(`
           SELECT count(d.donor_id)::int AS total
             FROM donor d
+            JOIN app_user u ON u.user_id = d.user_id
           ${eligibleJoin}
           ${whereClause} ${extraWhere}
         `, params);

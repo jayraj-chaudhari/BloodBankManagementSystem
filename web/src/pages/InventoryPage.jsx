@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { PackageCheck, Clock, AlertTriangle, ShieldCheck, RefreshCw, Filter, Layers, ScrollText, Database } from 'lucide-react';
+import { PackageCheck, Clock, AlertTriangle, ShieldCheck, RefreshCw, Filter, Layers, ScrollText, Database, Search, RotateCcw } from 'lucide-react';
 import { inventoryApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
@@ -21,7 +21,10 @@ export default function InventoryPage() {
   // Unit filters
   const [statusFilter, setStatusFilter] = useState('');
   const [componentFilter, setComponentFilter] = useState('');
+  const [bloodGroupFilter, setBloodGroupFilter] = useState('');
+  const [regionFilter, setRegionFilter] = useState('');
   const [expiringFilter, setExpiringFilter] = useState('');
+  const [unitSearch, setUnitSearch] = useState('');
 
   // Ledger filters
   const [ledgerRegion, setLedgerRegion] = useState('');
@@ -37,9 +40,11 @@ export default function InventoryPage() {
         const pubRes = await inventoryApi.getPublicInventory();
         setPublicInventory(pubRes.data || []);
       } else {
-        const params = {};
+        const params = { limit: 100 };
         if (statusFilter) params.status = statusFilter;
         if (componentFilter) params.component = componentFilter;
+        if (bloodGroupFilter) params.blood_group = bloodGroupFilter;
+        if (regionFilter) params.region_code = regionFilter;
         if (expiringFilter) params.expiring_within_days = expiringFilter;
 
         const [unitRes, pubRes] = await Promise.all([
@@ -60,7 +65,7 @@ export default function InventoryPage() {
     if (isHospital) return;
     try {
       setLedgerLoading(true);
-      const params = {};
+      const params = { limit: 100 };
       if (ledgerRegion) params.region_code = ledgerRegion;
       if (ledgerType) params.movement_type = ledgerType;
       if (ledgerUnitId) params.unit_id = ledgerUnitId;
@@ -74,9 +79,24 @@ export default function InventoryPage() {
     }
   };
 
+  const handleResetUnitFilters = () => {
+    setStatusFilter('');
+    setComponentFilter('');
+    setBloodGroupFilter('');
+    setRegionFilter('');
+    setExpiringFilter('');
+    setUnitSearch('');
+  };
+
+  const handleResetLedgerFilters = () => {
+    setLedgerRegion('');
+    setLedgerType('');
+    setLedgerUnitId('');
+  };
+
   useEffect(() => {
     loadStock();
-  }, [role, statusFilter, componentFilter, expiringFilter, lastInventoryEvent]);
+  }, [role, statusFilter, componentFilter, bloodGroupFilter, regionFilter, expiringFilter, lastInventoryEvent]);
 
   useEffect(() => {
     if (activeTab === 'ledger') {
@@ -109,6 +129,19 @@ export default function InventoryPage() {
       setMessage({ type: 'error', text: err.message || 'Status transition rejected by database state machine trigger' });
     }
   };
+
+  const filteredUnits = units.filter(u => {
+    const term = unitSearch.trim().toLowerCase();
+    if (!term) return true;
+    return (
+      u.unit_code?.toLowerCase().includes(term) ||
+      u.blood_group?.toLowerCase().includes(term) ||
+      u.component?.toLowerCase().includes(term) ||
+      u.branch_name?.toLowerCase().includes(term) ||
+      u.region_code?.toLowerCase().includes(term) ||
+      String(u.unit_id).includes(term)
+    );
+  });
 
   return (
     <div>
@@ -326,6 +359,15 @@ export default function InventoryPage() {
             >
               Refresh Ledger
             </button>
+
+            {(ledgerRegion || ledgerType || ledgerUnitId) && (
+              <button
+                onClick={handleResetLedgerFilters}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '8px 14px', backgroundColor: '#ffffff', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}
+              >
+                <RotateCcw size={13} /> Reset
+              </button>
+            )}
           </div>
 
           <div className="hope-card" style={{ padding: '24px' }}>
@@ -421,8 +463,17 @@ export default function InventoryPage() {
         /* BLOOD UNITS (COLD-CHAIN) TAB */
         <>
           {/* Filter toolbar for Staff */}
-          <div className="hope-card" style={{ padding: '16px 20px', marginBottom: '24px', display: 'flex', gap: '16px', alignItems: 'center', flexWrap: 'wrap' }}>
-            <div style={{ fontSize: '13px', fontWeight: '700' }}>Filters:</div>
+          <div className="hope-card" style={{ padding: '16px 20px', marginBottom: '24px', display: 'flex', gap: '14px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, minWidth: '220px', backgroundColor: '#f5f6fa', padding: '8px 14px', borderRadius: '8px' }}>
+              <Search size={16} color="var(--text-muted)" />
+              <input
+                type="text"
+                placeholder="Search barcode, unit code, branch, group..."
+                value={unitSearch}
+                onChange={(e) => setUnitSearch(e.target.value)}
+                style={{ border: 'none', background: 'transparent', width: '100%', fontSize: '13px' }}
+              />
+            </div>
 
             <select
               value={statusFilter}
@@ -436,6 +487,27 @@ export default function InventoryPage() {
               <option value="ISSUED">ISSUED</option>
               <option value="EXPIRED">EXPIRED</option>
               <option value="DISCARDED">DISCARDED</option>
+            </select>
+
+            <select
+              value={bloodGroupFilter}
+              onChange={(e) => setBloodGroupFilter(e.target.value)}
+              style={{ padding: '8px 14px', borderRadius: '8px', border: '1px solid var(--border)', fontSize: '13px' }}
+            >
+              <option value="">All Groups</option>
+              {['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'].map(bg => <option key={bg} value={bg}>{bg}</option>)}
+            </select>
+
+            <select
+              value={regionFilter}
+              onChange={(e) => setRegionFilter(e.target.value)}
+              style={{ padding: '8px 14px', borderRadius: '8px', border: '1px solid var(--border)', fontSize: '13px' }}
+            >
+              <option value="">All Regions</option>
+              <option value="SUR">Surat (SUR)</option>
+              <option value="AHM">Ahmedabad (AHM)</option>
+              <option value="VAD">Vadodara (VAD)</option>
+              <option value="RAJ">Rajkot (RAJ)</option>
             </select>
 
             <select
@@ -456,11 +528,72 @@ export default function InventoryPage() {
               style={{ padding: '8px 14px', borderRadius: '8px', border: '1px solid var(--border)', fontSize: '13px' }}
             >
               <option value="">Any Expiry Window</option>
-              <option value="3">Expiring within 3 Days</option>
-              <option value="7">Expiring within 7 Days</option>
-              <option value="14">Expiring within 14 Days</option>
+              <option value="3">Expiring in ≤3 Days</option>
+              <option value="7">Expiring in ≤7 Days</option>
+              <option value="14">Expiring in ≤14 Days</option>
             </select>
+
+            {(statusFilter || componentFilter || bloodGroupFilter || regionFilter || expiringFilter || unitSearch) && (
+              <button
+                onClick={handleResetUnitFilters}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '8px 14px',
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '8px',
+                  fontSize: '13px',
+                  fontWeight: '600',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer'
+                }}
+              >
+                <RotateCcw size={13} /> Reset
+              </button>
+            )}
           </div>
+
+          {/* Active filter summary tag */}
+          {(statusFilter || componentFilter || bloodGroupFilter || regionFilter || expiringFilter || unitSearch) && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', fontSize: '12px', color: 'var(--text-muted)', flexWrap: 'wrap' }}>
+              <span style={{ fontWeight: '700' }}>Active Filters:</span>
+              {statusFilter && (
+                <span style={{ padding: '2px 8px', borderRadius: '4px', backgroundColor: '#e0f2fe', color: '#0369a1', fontWeight: '700' }}>
+                  Status: {statusFilter}
+                </span>
+              )}
+              {bloodGroupFilter && (
+                <span style={{ padding: '2px 8px', borderRadius: '4px', backgroundColor: '#f0f3fe', color: 'var(--primary)', fontWeight: '700' }}>
+                  Group: {bloodGroupFilter}
+                </span>
+              )}
+              {regionFilter && (
+                <span style={{ padding: '2px 8px', borderRadius: '4px', backgroundColor: '#e0f2fe', color: '#0369a1', fontWeight: '700' }}>
+                  Region: {regionFilter}
+                </span>
+              )}
+              {componentFilter && (
+                <span style={{ padding: '2px 8px', borderRadius: '4px', backgroundColor: '#f1f5f9', color: '#475569', fontWeight: '700' }}>
+                  Component: {componentFilter.replace('_', ' ')}
+                </span>
+              )}
+              {expiringFilter && (
+                <span style={{ padding: '2px 8px', borderRadius: '4px', backgroundColor: '#fee2e2', color: '#dc2626', fontWeight: '700' }}>
+                  Expiring: ≤{expiringFilter}d
+                </span>
+              )}
+              {unitSearch && (
+                <span style={{ padding: '2px 8px', borderRadius: '4px', backgroundColor: '#f1f5f9', color: '#475569', fontWeight: '700' }}>
+                  Search: "{unitSearch}"
+                </span>
+              )}
+              <span style={{ marginLeft: 'auto', fontWeight: '700', color: 'var(--text-main)' }}>
+                Showing {filteredUnits.length} unit(s)
+              </span>
+            </div>
+          )}
 
           {/* Units Table */}
           <div className="hope-card" style={{ padding: '24px' }}>
@@ -480,10 +613,10 @@ export default function InventoryPage() {
               <tbody>
                 {loading ? (
                   <tr><td colSpan={canModify ? 8 : 7} style={{ textAlign: 'center', padding: '30px' }}>Loading blood units...</td></tr>
-                ) : units.length === 0 ? (
-                  <tr><td colSpan={canModify ? 8 : 7} style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>No units found</td></tr>
+                ) : filteredUnits.length === 0 ? (
+                  <tr><td colSpan={canModify ? 8 : 7} style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>No units found matching criteria</td></tr>
                 ) : (
-                  units.map((u) => {
+                  filteredUnits.map((u) => {
                     const isAvail = u.status === 'AVAILABLE';
                     const isQuarantine = u.status === 'QUARANTINE';
                     const isIssued = u.status === 'ISSUED';
